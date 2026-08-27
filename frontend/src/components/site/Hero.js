@@ -1,21 +1,24 @@
 import { motion } from "framer-motion";
-
-const HERO_BG =
-  "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODF8MHwxfHNlYXJjaHw0fHxuaWdodGNsdWIlMjBmZXN0aXZhbCUyMGNyb3dkfGVufDB8fHx8MTc4Nzg0NDk2OXww&ixlib=rb-4.1.0&q=85";
+import { Link } from "react-router-dom";
 
 const ease = [0.16, 1, 0.3, 1];
 
 export default function Hero({ event }) {
   return (
     <section
-      className="relative h-screen flex flex-col items-center justify-center overflow-hidden"
+      className="relative h-screen overflow-hidden"
       data-testid="hero-section"
     >
-      <div className="absolute inset-0 -z-10">
-        <img src={HERO_BG} alt="" className="w-full h-full object-cover opacity-20" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#060609]/60 via-transparent to-[#060609]" />
+      <div className="absolute inset-0 z-0">
+        <video autoPlay muted loop playsInline preload="auto" className="w-full h-full object-cover">
+          <source src="/assets/hero-bg.webm" type="video/webm" />
+          <source src="/assets/hero-bg.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#060609]/70 via-transparent to-[#060609]" />
       </div>
 
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-5">
       <motion.div
         initial={{ opacity: 0, y: -24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -43,6 +46,21 @@ export default function Hero({ event }) {
         transition={{ delay: 0.55, duration: 1.2, ease }}
         className="w-[80vw] max-w-[620px] object-contain"
       />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.2, duration: 0.9, ease }}
+      >
+        <Link
+          to="/tickets"
+          data-testid="buy-tickets-button"
+          className="inline-block mt-10 sm:mt-12 bg-[#FF6A00] text-white font-display font-bold uppercase text-sm sm:text-base tracking-[0.2em] px-12 py-4 rounded-full shadow-[0_0_45px_rgba(255,106,0,0.45)] hover:bg-[#FF8534] hover:shadow-[0_0_60px_rgba(255,106,0,0.65)] hover:scale-105 active:scale-95 transition-all duration-300"
+        >
+          Buy Tickets
+        </Link>
+      </motion.div>
+      </div>
 
     </section>
   );
