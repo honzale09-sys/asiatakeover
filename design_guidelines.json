@@ -1,0 +1,104 @@
+{
+  "project_name": "ASIA TAKEOVER FESTIVAL",
+  "theme": "Dark Cyber-Club Neon Aesthetic (Seoul / Tokyo Nightlife meets Prague Underground)",
+  "color_palette": {
+    "background": {
+      "main": "#060609",
+      "card": "#0D0E15",
+      "card_hover": "#141622",
+      "overlay": "rgba(6, 6, 9, 0.82)"
+    },
+    "brand_colors": {
+      "crimson_neon": "#FF0055",
+      "cyber_cyan": "#00F0FF",
+      "acid_yellow": "#FFE600",
+      "seoul_purple": "#8A2BE2",
+      "obsidian_gray": "#181925"
+    },
+    "typography_colors": {
+      "primary": "#FFFFFF",
+      "secondary": "#94A3B8",
+      "accent": "#FF0055",
+      "muted": "#64748B"
+    },
+    "borders": {
+      "subtle": "rgba(255, 255, 255, 0.12)",
+      "glowing_neon": "rgba(255, 0, 85, 0.5)",
+      "cyan_glow": "rgba(0, 240, 255, 0.5)"
+    }
+  },
+  "typography": {
+    "headings": {
+      "font_family": "'Unbounded', 'Syne', 'Space Grotesk', sans-serif",
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-black uppercase tracking-tighter leading-none",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-tight",
+      "h3": "text-xl sm:text-2xl font-bold uppercase tracking-normal"
+    },
+    "body": {
+      "font_family": "'Inter', sans-serif",
+      "standard": "text-base font-normal leading-relaxed text-slate-300",
+      "small": "text-sm text-slate-400 font-normal"
+    },
+    "mono_meta": {
+      "font_family": "'JetBrains Mono', 'Source Code Pro', monospace",
+      "label": "text-xs uppercase tracking-[0.2em] text-cyan-400 font-semibold"
+    }
+  },
+  "spacing_and_layout": {
+    "container_padding": "px-4 sm:px-8 lg:px-16 py-12 lg:py-24",
+    "grid_gap": "gap-6 lg:gap-10",
+    "bento_mode": "Tetris Grid with high visual tension and asymmetrical spans",
+    "section_spacing": "space-y-24 lg:space-y-36"
+  },
+  "visual_enhancers": {
+    "texture_overlays": "Subtle noise grain overlay (2% opacity) + faint horizontal scanlines for club poster feel",
+    "glassmorphism": "backdrop-blur-xl bg-black/60 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
+    "neon_glows": "shadow-[0_0_30px_rgba(255,0,85,0.35)] and shadow-[0_0_30px_rgba(0,240,255,0.35)]",
+    "tape_marquees": "Continuous infinite text marquee ribbon with high-energy event tags (DUPLEX x SEOULVIBES x GANGSHII)"
+  },
+  "image_urls": {
+    "hero_background": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODF8MHwxfHNlYXJjaHw0fHxuaWdodGNsdWIlMjBmZXN0aXZhbCUyMGNyb3dkfGVufDB8fHx8MTc4Nzg0NDk2OXww&ixlib=rb-4.1.0&q=85",
+    "dj_stage": "https://images.unsplash.com/photo-1657208431551-cbf415b8ef26?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwyfHxkaiUyMHN0YWdlJTIwbGlnaHRzfGVufDB8fHx8MTc4Nzg0NDk2OXww&ixlib=rb-4.1.0&q=85",
+    "rooftop_terrace": "https://images.unsplash.com/photo-1731194807352-402a0130adb5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHw0fHxyb29mdG9wJTIwcGFydHklMjBuaWdodHxlbnwwfHx8fDE3ODc4NDQ5Njl8MA&ixlib=rb-4.1.0&q=85",
+    "crowd_cheering": "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODF8MHwxfHNlYXJjaHwxfHxuaWdodGNsdWIlMjBmZXN0aXZhbCUyMGNyb3dkfGVufDB8fHx8MTc4Nzg0NDk2OXww&ixlib=rb-4.1.0&q=85",
+    "light_strobe": "https://images.unsplash.com/photo-1599739291060-4578e77dac5d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHw0fHxkaiUyMHN0YWdlJTIwbGlnaHRzfGVufDB8fHx8MTc4Nzg0NDk2OXww&ixlib=rb-4.1.0&q=85"
+  },
+  "component_structure": {
+    "public_landing": {
+      "navbar": "Sticky glassmorphic top header with event date countdown ticker, nav links (Lineup, Floors, Tickets, VIP, FAQ), and 'BUY TICKETS' glowing CTA",
+      "hero": "Kinetic typography reveal 'ASIA TAKEOVER FESTIVAL - PRAGUE 2026', massive date '27.09.2026', venue badge 'DUPLEX PRAGUE', presented by DUPLEX x SeoulVibes x GANGSHII, animated audio equalizer bars & live ticket counter",
+      "lineup_section": "10 Featured DJs filterable by Genre (K-POP, HipHop/RnB, Vinahouse, J-POP, Pop Hits, Choreography Dance), interactive DJ cards with music genre tags, stage time slots, and sound preview trigger",
+      "floors_experience": "3 Floors + 2 Rooftops interactive floorplan selector (Main Stage, Underground Vinahouse Vault, K-POP Sky Terrace, Rooftop Lounge 1, Rooftop Lounge 2), photo highlights & photobooth zone info",
+      "tickets_section": "Interactive ticket pricing tiers (Early Bird, General Admission, VIP Sky Lounge, Ultra VIP Table). MOCKED payment flow with instant QR E-ticket generator modal & PDF download simulation",
+      "faq_section": "Collapsible interactive accordion answering dress code, door policy (18+), Soju bar list, photobooth zones, location details",
+      "contact_and_location": "Interactive map preview of Duplex Prague (Wenceslas Square), VIP booking form, contact details, social links"
+    },
+    "admin_dashboard": {
+      "path": "/admin",
+      "style": "Cyberpunk command deck dashboard",
+      "features": [
+        "Real-time sales revenue & ticket breakdown statistics (charts via Recharts)",
+        "Orders & E-tickets list table with search, filter, export, and status toggles",
+        "Event Party CRUD Manager (Add/Edit/Remove DJ line-ups, floor schedules, set times)",
+        "CMS Content Editor for site announcements, ticket prices, and hero banners"
+      ]
+    },
+    "qr_scanner_tool": {
+      "path": "/nascanujtobrasko",
+      "style": "High-visibility door staff scanning interface",
+      "features": [
+        "Live camera video viewport / QR scanner target overlay with pulsating laser guide",
+        "Manual ticket ID / QR hash lookup fallback input",
+        "Instant audio-visual response modal (Green Pass 'VALID TICKET - VIP ACCESS' vs Red Alert 'INVALID OR ALREADY USED')",
+        "Real-time door check-in feed log with timestamp and door guard stats counter"
+      ]
+    }
+  },
+  "instructions_to_main_agent": [
+    "Ensure all interactive components (buttons, tabs, inputs, modals, menu items, table rows) contain role-based data-testid attributes (e.g. data-testid='buy-ticket-button', data-testid='qr-scanner-input').",
+    "Never use fully transparent backgrounds for dropdowns, popovers, or floating headers. Use backdrop-blur with minimum 60% opacity dark background.",
+    "Do not use generic 'Inter' font for main display headings. Use bold display typography with tight letter-spacing (tracking-tighter) and uppercase styling.",
+    "Ensure all mock checkout payments succeed smoothly and output a visual QR Code ticket with downloadable/printable format.",
+    "Ensure /nascanujtobrasko door scanner allows testing both via simulated camera feed scan and instant manual code entry."
+  ]
+}
