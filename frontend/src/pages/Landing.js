@@ -4,7 +4,6 @@ import { api } from "@/api";
 import Navbar from "@/components/site/Navbar";
 import Hero from "@/components/site/Hero";
 import Gallery from "@/components/site/Gallery";
-import Tickets from "@/components/site/Tickets";
 import Footer from "@/components/site/Footer";
 
 const FALLBACK = {
@@ -62,7 +61,6 @@ export default function Landing() {
       <Navbar />
       <Hero event={data.event} />
       <Gallery />
-      <Tickets tiers={data.tiers} event={data.event} />
       <Footer event={data.event} content={data.content} />
     </div>
   );

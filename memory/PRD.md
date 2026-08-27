@@ -17,7 +17,7 @@ User choices: MOCKED demo checkout; sections Hero + Lineup + Tickets + FAQ + Con
 - Door staff: scans/validates QR codes at entrance
 
 ## Implemented (2026-08-27)
-- Minimalist redesign (v2): black hero with official ASIA TAKEOVER logo center, GANGSHII / DUPLEX / SEOULVIBES logos above, animated scroll-down indicator; NOCTA-style pinned scroll gallery (crowd / sound / rooftops chapters + official 3-floor venue map with scale-from-card scroll animation); tickets + minimal footer. User assets processed to transparent PNGs and served from /assets. More event photos to come from user — drop into Gallery CHAPTERS.
+- Minimalist redesign (v2): black hero with official ASIA TAKEOVER logo center, GANGSHII / DUPLEX / SEOULVIBES logos above; NOCTA-style pinned scroll gallery with ONLY the official 3-floor venue map (KPOP ROOM / WORLD MUSIC / SAIGON FLOOR) with scale-from-card scroll animation; minimal footer. v3 trim: removed scroll indicator, hero date line, GET TICKETS button, stock photo chapters, and the entire Tickets/"Choose Your Weapon" section from the landing (checkout components kept in repo, unused). User assets processed to transparent PNGs in /assets. More event photos to come from user — drop into Gallery CHAPTERS.
 - Awwwards-style landing v1 (replaced by v2): kinetic hero, lineup filters, floors explorer, FAQ, contact form
 - Demo checkout (MOCKED payment) issuing instant QR e-tickets
 - Admin /admin: stats + sales chart, orders table w/ search + CSV export, party CRUD (incl. lineup JSON editor), tier CRUD, site content editor, contact messages inbox

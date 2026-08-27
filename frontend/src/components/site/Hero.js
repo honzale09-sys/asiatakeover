@@ -44,41 +44,6 @@ export default function Hero({ event }) {
         className="w-[80vw] max-w-[620px] object-contain"
       />
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.1, duration: 1 }}
-        className="mt-10 sm:mt-14 flex flex-col items-center gap-5"
-      >
-        <p className="font-mono2 text-xs sm:text-sm tracking-[0.35em] uppercase text-white/70" data-testid="hero-date">
-          {event?.date_label || "27.09.2026"} — {event?.venue || "DUPLEX"} {event?.city || "Prague"}
-        </p>
-        <button
-          data-testid="hero-buy-tickets-button"
-          onClick={() => document.getElementById("tickets")?.scrollIntoView({ behavior: "smooth" })}
-          className="font-mono2 text-[11px] sm:text-xs uppercase tracking-[0.3em] border border-white/30 hover:bg-white hover:text-black rounded-full px-8 py-3 transition-colors duration-300"
-        >
-          Get Tickets
-        </button>
-      </motion.div>
-
-      <motion.button
-        data-testid="scroll-down-indicator"
-        onClick={() => document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" })}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.6, duration: 1 }}
-        className="absolute bottom-8 flex flex-col items-center gap-3 text-white/60 hover:text-white transition-colors"
-      >
-        <span className="font-mono2 text-[10px] tracking-[0.4em] uppercase">Scroll</span>
-        <div className="w-px h-12 bg-white/20 relative overflow-hidden">
-          <motion.span
-            className="absolute top-0 left-0 w-full h-4 bg-white"
-            animate={{ y: [-16, 48] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          />
-        </div>
-      </motion.button>
     </section>
   );
 }
