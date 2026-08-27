@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/api";
+import { trackEvent } from "@/lib/tracking";
 import Tickets from "@/components/site/Tickets";
 
 export default function TicketsPage() {
@@ -13,6 +14,17 @@ export default function TicketsPage() {
       .then((r) => setSite(r.data))
       .catch(() => setFailed(true));
   }, []);
+
+  useEffect(() => {
+    if (site) {
+      trackEvent("ViewContent", {
+        content_ids: (site.tiers || []).map((t) => t.id),
+        content_type: "product",
+        content_name: site.event?.name,
+        currency: "CZK",
+      });
+    }
+  }, [site]);
 
   return (
     <div className="min-h-screen bg-[#060609] text-white" data-testid="tickets-page">

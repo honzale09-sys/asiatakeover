@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { Check, X } from "lucide-react";
 import { api, formatError, czk } from "@/api";
+import { buildOrderAttribution, marketingAllowed, trackEvent } from "@/lib/tracking";
 import { Reveal, SectionHead } from "./Reveal";
 
 const inputCls =
@@ -13,26 +14,33 @@ function CheckoutModal({ tier, event, onClose }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [qty, setQty] = useState(1);
-  const [result, setResult] = useState(null);
   const left = Math.max(0, tier.capacity - (tier.sold || 0));
   const maxQty = Math.min(10, left || 10);
+
+  useEffect(() => {
+    trackEvent("InitiateCheckout", {
+      content_ids: [tier.id],
+      content_type: "product",
+      content_name: tier.name,
+      value: tier.price_czk,
+      currency: "CZK",
+      num_items: 1,
+    }, `ic_${tier.id}_${Date.now()}`);
+  }, [tier]);
 
   const pay = async (e) => {
     e.preventDefault();
     setStep("processing");
     try {
-      const [r] = await Promise.all([
-        api.post("/orders", {
-          event_id: event.id,
-          tier_id: tier.id,
-          quantity: qty,
-          name,
-          email,
-        }),
-        new Promise((res) => setTimeout(res, 1300)),
-      ]);
-      setResult(r.data);
-      setStep("success");
+      const r = await api.post("/orders/create", {
+        tier_id: tier.id,
+        quantity: qty,
+        name,
+        email,
+        attribution: buildOrderAttribution(),
+        marketing_consent: marketingAllowed(),
+      });
+      window.location.assign(r.data.payment_url);
     } catch (e2) {
       toast.error(formatError(e2));
       setStep("form");
@@ -53,7 +61,7 @@ function CheckoutModal({ tier, event, onClose }) {
 
         {step === "form" && (
           <form onSubmit={pay}>
-            <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-[#00F0FF] mb-2">Demo checkout</p>
+            <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-[#00F0FF] mb-2">Secure checkout</p>
             <h3 className="font-display font-extrabold text-2xl uppercase mb-1">{tier.name}</h3>
             <p className="text-slate-400 text-sm mb-6">
               {event.name} · {event.date_label} · {event.venue} {event.city}
@@ -86,55 +94,20 @@ function CheckoutModal({ tier, event, onClose }) {
             <button
               type="submit"
               data-testid="checkout-pay-button"
-              className="mt-6 w-full bg-[#FF0055] hover:bg-[#FFE600] hover:text-black text-white font-display font-bold uppercase text-sm py-4 rounded-full transition-colors duration-300 neon-shadow"
+              className="mt-6 w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-sm py-4 rounded-full transition-colors duration-300 shadow-[0_0_45px_rgba(255,106,0,0.35)]"
             >
-              Pay {czk(tier.price_czk * qty)} — Demo
+              Continue to Payment — {czk(tier.price_czk * qty)}
             </button>
             <p className="font-mono2 text-[11px] text-slate-500 mt-3 text-center">
-              Mocked payment — no real money is charged. QR e-tickets are issued instantly.
+              You'll be redirected to the payment gateway. Tickets are issued only after the payment is confirmed.
             </p>
           </form>
         )}
 
         {step === "processing" && (
           <div className="py-16 flex flex-col items-center gap-5" data-testid="checkout-processing">
-            <div className="w-12 h-12 rounded-full border-2 border-white/15 border-t-[#FF0055] animate-spin" />
-            <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-slate-400">Processing demo payment…</p>
-          </div>
-        )}
-
-        {step === "success" && result && (
-          <div data-testid="checkout-success-panel">
-            <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-[#00F0FF] mb-2">Payment confirmed</p>
-            <h3 className="font-display font-extrabold text-2xl uppercase mb-1 text-[#FFE600]">You're in!</h3>
-            <p className="text-slate-400 text-sm mb-6">
-              Order <span className="font-mono2 text-slate-300">{result.order.id.slice(0, 8)}</span> · Screenshot your
-              tickets and show the QR code at the entrance.
-            </p>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {result.tickets.map((t) => (
-                <div key={t.code} data-testid={`ticket-qr-${t.code}`} className="border border-white/10 rounded-xl p-4 bg-[#0D0E15] flex gap-4 items-center">
-                  <div className="bg-white rounded-lg p-1.5 shrink-0">
-                    <img src={t.qr} alt={`QR ${t.code}`} className="w-24 h-24" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-mono2 font-bold text-sm text-[#00F0FF]">{t.code}</p>
-                    <p className="font-display text-xs uppercase mt-1 truncate">{t.holder_name}</p>
-                    <p className="font-mono2 text-[11px] text-slate-400 mt-1">{t.tier_name}</p>
-                    <p className="font-mono2 text-[11px] text-slate-500 mt-0.5">
-                      {event.date_label} · {event.venue}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button
-              onClick={onClose}
-              data-testid="checkout-done-button"
-              className="mt-6 w-full border border-white/20 hover:border-[#00F0FF] hover:text-[#00F0FF] font-display font-bold uppercase text-sm py-3.5 rounded-full transition-colors duration-300"
-            >
-              Done
-            </button>
+            <div className="w-12 h-12 rounded-full border-2 border-white/15 border-t-[#FF6A00] animate-spin" />
+            <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-slate-400">Creating your order…</p>
           </div>
         )}
       </div>

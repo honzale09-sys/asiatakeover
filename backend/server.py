@@ -5,20 +5,26 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import base64
+import hashlib
 import io
 import logging
 import os
+import re
 import secrets
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
 
 import bcrypt
+import httpx
 import jwt
 import qrcode
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
+from pymongo import ReturnDocument
 from starlette.middleware.cors import CORSMiddleware
 
 mongo_url = os.environ["MONGO_URL"]
@@ -162,58 +168,385 @@ async def get_site():
     return {"event": event, "tiers": tiers, "content": content}
 
 
-class OrderIn(BaseModel):
-    event_id: str
+class AttributionIn(BaseModel):
+    first_touch: Optional[dict] = None
+    last_touch: Optional[dict] = None
+    fbp: Optional[str] = None
+    fbc: Optional[str] = None
+    event_source_url: Optional[str] = None
+
+
+class OrderCreateIn(BaseModel):
     tier_id: str
     quantity: int = Field(ge=1, le=10)
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
+    attribution: Optional[AttributionIn] = None
+    marketing_consent: bool = False
 
 
-@api_router.post("/orders")
-async def create_order(data: OrderIn):
-    event = await db.events.find_one({"id": data.event_id}, {"_id": 0})
+# ---------------- payments config ----------------
+
+SITE_URL = os.environ.get("SITE_URL", "").rstrip("/")
+GOPAY_BASE_URL = os.environ.get("GOPAY_BASE_URL", "").rstrip("/")
+GOPAY_GO_ID = os.environ.get("GOPAY_GO_ID", "")
+GOPAY_CLIENT_ID = os.environ.get("GOPAY_CLIENT_ID", "")
+GOPAY_CLIENT_SECRET = os.environ.get("GOPAY_CLIENT_SECRET", "")
+META_PIXEL_ID = os.environ.get("META_PIXEL_ID", "")
+META_CAPI_TOKEN = os.environ.get("META_CAPI_ACCESS_TOKEN", "")
+META_TEST_EVENT_CODE = os.environ.get("META_TEST_EVENT_CODE", "")
+META_API_VERSION = os.environ.get("META_API_VERSION", "v21.0")
+
+GOPAY_STATE_MAP = {
+    "CREATED": "created",
+    "PAYMENT_METHOD_CHOSEN": "pending",
+    "PAID": "paid",
+    "AUTHORIZED": "paid",
+    "CANCELED": "cancelled",
+    "TIMEOUTED": "timeouted",
+    "REFUNDED": "refunded",
+    "PARTIALLY_REFUNDED": "partially_refunded",
+}
+
+
+def gopay_configured() -> bool:
+    return bool(GOPAY_BASE_URL and GOPAY_GO_ID and GOPAY_CLIENT_ID and GOPAY_CLIENT_SECRET)
+
+
+_gopay_token_cache = {"token": None, "exp": 0.0}
+
+
+async def gopay_token() -> str:
+    if _gopay_token_cache["token"] and _gopay_token_cache["exp"] > time.time() + 60:
+        return _gopay_token_cache["token"]
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.post(
+            f"{GOPAY_BASE_URL}/oauth2/token",
+            auth=(GOPAY_CLIENT_ID, GOPAY_CLIENT_SECRET),
+            data={"grant_type": "client_credentials", "scope": "payment-all"},
+            headers={"Accept": "application/json"},
+        )
+    r.raise_for_status()
+    body = r.json()
+    _gopay_token_cache["token"] = body["access_token"]
+    _gopay_token_cache["exp"] = time.time() + int(body.get("expires_in", 1800))
+    return _gopay_token_cache["token"]
+
+
+async def gopay_create_payment(order: dict) -> dict:
+    token = await gopay_token()
+    payload = {
+        "amount": order["amount_czk"] * 100,
+        "currency": "CZK",
+        "order_number": order["id"],
+        "order_description": f"{order['tier_name']} x{order['quantity']}",
+        "payer": {"contact": {"email": order["buyer_email"]}},
+        "target": {"type": "ACCOUNT", "goid": int(GOPAY_GO_ID)},
+        "callback": {
+            "return_url": f"{SITE_URL}/success?order_id={order['id']}",
+            "notification_url": f"{SITE_URL}/api/payments/gopay/notification",
+        },
+        "lang": "EN",
+    }
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.post(
+            f"{GOPAY_BASE_URL}/payments/payment",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        )
+    if r.is_error:
+        logger.error("GoPay payment create failed: HTTP %s", r.status_code)
+        raise HTTPException(502, "Payment gateway error")
+    return r.json()
+
+
+async def gopay_get_payment(payment_id: str) -> dict:
+    token = await gopay_token()
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.get(
+            f"{GOPAY_BASE_URL}/payments/payment/{payment_id}",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        )
+    r.raise_for_status()
+    return r.json()
+
+
+# ---------------- Meta CAPI ----------------
+
+def sha256_norm(value: str) -> str:
+    return hashlib.sha256(re.sub(r"\s+", "", value.strip().lower()).encode()).hexdigest()
+
+
+async def send_capi_purchase(order: dict):
+    event_id = f"purchase_{order['id']}"
+    if not META_CAPI_TOKEN or not META_PIXEL_ID:
+        logger.info("Meta CAPI not configured — skipping server Purchase %s", event_id)
+        return
+    if await db.meta_events.find_one({"event_id": event_id}):
+        return
+    attr = order.get("attribution") or {}
+    user_data = {}
+    if order.get("marketing_consent"):
+        user_data["em"] = [sha256_norm(order["buyer_email"])]
+        if order.get("client_ip"):
+            user_data["client_ip_address"] = order["client_ip"]
+        if order.get("user_agent"):
+            user_data["client_user_agent"] = order["user_agent"]
+        if attr.get("fbp"):
+            user_data["fbp"] = attr["fbp"]
+        if attr.get("fbc"):
+            user_data["fbc"] = attr["fbc"]
+    event = {
+        "event_name": "Purchase",
+        "event_time": int(time.time()),
+        "event_id": event_id,
+        "action_source": "website",
+        "event_source_url": attr.get("event_source_url") or SITE_URL,
+        "user_data": user_data,
+        "custom_data": {
+            "value": order["amount_czk"],
+            "currency": "CZK",
+            "content_ids": [order["tier_id"]],
+            "content_type": "product",
+            "content_name": order["tier_name"],
+            "num_items": order["quantity"],
+            "order_id": order["id"],
+        },
+    }
+    body = {"data": [event]}
+    if META_TEST_EVENT_CODE:
+        body["test_event_code"] = META_TEST_EVENT_CODE
+    url = f"https://graph.facebook.com/{META_API_VERSION}/{META_PIXEL_ID}/events"
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.post(url, params={"access_token": META_CAPI_TOKEN}, json=body)
+        await db.meta_events.insert_one(
+            {"event_id": event_id, "sent_at": utcnow().isoformat(), "http_status": r.status_code}
+        )
+        if r.status_code >= 400:
+            logger.error("Meta CAPI rejected Purchase for order %s: HTTP %s", order["id"], r.status_code)
+    except Exception as e:
+        logger.error("Meta CAPI send failed for order %s: %s", order["id"], type(e).__name__)
+
+
+# ---------------- fulfillment & reconciliation ----------------
+
+async def fulfill_order(order_id: str):
+    order = await db.orders.find_one_and_update(
+        {"id": order_id, "fulfillment_status": {"$ne": "fulfilled"}},
+        {"$set": {
+            "fulfillment_status": "fulfilled",
+            "payment_status": "paid",
+            "paid_at": utcnow().isoformat(),
+            "updated_at": utcnow().isoformat(),
+        }},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not order:
+        return
+    for _ in range(order["quantity"]):
+        code = "ATF-" + secrets.token_hex(3).upper()
+        await db.tickets.insert_one({
+            "id": new_id(), "code": code, "order_id": order["id"],
+            "event_id": order["event_id"], "event_name": order["event_name"],
+            "tier_id": order["tier_id"], "tier_name": order["tier_name"],
+            "holder_name": order["buyer_name"], "buyer_email": order["buyer_email"],
+            "status": "valid", "created_at": utcnow().isoformat(),
+            "checked_in_at": None, "checked_in_by": None,
+        })
+    await send_capi_purchase(order)
+    logger.info(
+        "Order %s fulfilled: %d ticket(s) issued (email provider not configured — confirmation email pending)",
+        order["id"], order["quantity"],
+    )
+
+
+async def provider_status(payment_id: str):
+    if str(payment_id).startswith("SIM-"):
+        doc = await db.sim_payments.find_one({"id": str(payment_id)})
+        if not doc:
+            raise HTTPException(404, "Unknown payment")
+        return doc["state"], doc
+    p = await gopay_get_payment(payment_id)
+    return p.get("state", "CREATED"), p
+
+
+async def reconcile_payment(payment_id: str) -> str:
+    order = await db.orders.find_one({"gopay_payment_id": str(payment_id)})
+    if not order:
+        raise HTTPException(404, "Unknown payment")
+    state, raw = await provider_status(str(payment_id))
+    if not str(payment_id).startswith("SIM-"):
+        if (raw.get("amount") != order["amount_czk"] * 100
+                or raw.get("currency") != "CZK"
+                or raw.get("order_number") != order["id"]):
+            logger.error("GoPay payment mismatch for order %s", order["id"])
+            raise HTTPException(400, "Payment does not match order")
+    new_status = GOPAY_STATE_MAP.get(state, "created")
+    await db.orders.update_one(
+        {"id": order["id"]},
+        {"$set": {"payment_status": new_status, "updated_at": utcnow().isoformat()}},
+    )
+    if new_status == "paid":
+        await fulfill_order(order["id"])
+    elif new_status in ("refunded", "partially_refunded"):
+        await db.tickets.update_many(
+            {"order_id": order["id"], "status": "valid"},
+            {"$set": {"status": "refunded"}},
+        )
+    return new_status
+
+
+# ---------------- order endpoints ----------------
+
+_rate_hits = {}
+
+
+def rate_limit(ip: str, limit: int = 10, window: int = 300):
+    now = time.time()
+    hits = [t for t in _rate_hits.get(ip, []) if now - t < window]
+    if len(hits) >= limit:
+        raise HTTPException(429, "Too many requests. Try again later.")
+    hits.append(now)
+    _rate_hits[ip] = hits
+
+
+@api_router.post("/orders/create")
+async def create_order(data: OrderCreateIn, request: Request):
+    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (
+        request.client.host if request.client else "unknown")
+    rate_limit(ip)
+    event = await db.events.find_one({"active": True}, {"_id": 0})
     if not event:
-        raise HTTPException(404, "Event not found")
+        raise HTTPException(404, "No active event")
     tier = await db.ticket_tiers.find_one({"id": data.tier_id}, {"_id": 0})
-    if not tier:
+    if not tier or tier["event_id"] != event["id"]:
         raise HTTPException(404, "Ticket tier not found")
     sold = await db.tickets.count_documents({"tier_id": tier["id"]})
     if sold + data.quantity > tier["capacity"]:
         raise HTTPException(400, "Not enough tickets left in this tier")
-    order_id = new_id()
-    tickets = []
-    for _ in range(data.quantity):
-        code = "ATF-" + secrets.token_hex(3).upper()
-        t = {
-            "id": new_id(), "code": code, "order_id": order_id,
-            "event_id": event["id"], "event_name": event["name"],
-            "tier_id": tier["id"], "tier_name": tier["name"],
-            "holder_name": data.name, "buyer_email": data.email.lower(),
-            "status": "valid", "created_at": utcnow().isoformat(), "checked_in_at": None,
-        }
-        await db.tickets.insert_one(t)
-        t.pop("_id", None)
-        tickets.append(t)
     order = {
-        "id": order_id, "event_id": event["id"], "tier_id": tier["id"],
-        "tier_name": tier["name"], "quantity": data.quantity,
+        "id": new_id(),
+        "created_at": utcnow().isoformat(),
+        "updated_at": utcnow().isoformat(),
+        "event_id": event["id"],
+        "event_name": event["name"],
+        "tier_id": tier["id"],
+        "tier_name": tier["name"],
+        "quantity": data.quantity,
         "amount_czk": tier["price_czk"] * data.quantity,
-        "buyer_name": data.name, "buyer_email": data.email.lower(),
-        "status": "paid_mock", "created_at": utcnow().isoformat(),
+        "currency": "CZK",
+        "buyer_name": data.name,
+        "buyer_email": data.email.lower(),
+        "payment_status": "created",
+        "gopay_payment_id": None,
+        "paid_at": None,
+        "fulfillment_status": "pending",
+        "marketing_consent": data.marketing_consent,
+        "attribution": data.attribution.model_dump() if data.attribution else None,
+        "client_ip": ip,
+        "user_agent": request.headers.get("user-agent"),
     }
+    if gopay_configured():
+        p = await gopay_create_payment(order)
+        order["gopay_payment_id"] = str(p["id"])
+        payment_url = p["gw_url"]
+        mode = "gopay"
+    else:
+        pid = f"SIM-{order['id']}"
+        order["gopay_payment_id"] = pid
+        payment_url = f"/pay/{order['id']}"
+        mode = "simulation"
+        await db.sim_payments.insert_one({"id": pid, "state": "CREATED", "order_id": order["id"]})
     await db.orders.insert_one(order)
-    order.pop("_id", None)
-    return {"order": order, "tickets": [{**t, "qr": make_qr(t["code"])} for t in tickets]}
+    return {
+        "order_id": order["id"],
+        "payment_url": payment_url,
+        "mode": mode,
+        "amount_czk": order["amount_czk"],
+        "currency": "CZK",
+    }
 
 
-@api_router.get("/orders/{order_id}")
-async def get_order(order_id: str):
+@api_router.get("/orders/{order_id}/status")
+async def order_status(order_id: str):
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
         raise HTTPException(404, "Order not found")
+    return {
+        "order_id": order["id"],
+        "payment_status": order.get("payment_status", "created"),
+        "amount_czk": order["amount_czk"],
+        "currency": "CZK",
+        "tier_id": order["tier_id"],
+        "tier_name": order["tier_name"],
+        "quantity": order["quantity"],
+        "event_name": order.get("event_name", ""),
+        "purchase_event_id": f"purchase_{order['id']}",
+    }
+
+
+@api_router.get("/orders/{order_id}/tickets")
+async def order_tickets(order_id: str):
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.get("payment_status") not in ("paid", "paid_mock"):
+        raise HTTPException(403, "Tickets are available only after the payment is confirmed")
     tickets = await db.tickets.find({"order_id": order_id}, {"_id": 0}).to_list(50)
-    return {"order": order, "tickets": [{**t, "qr": make_qr(t["code"])} for t in tickets]}
+    return {"order_id": order_id, "tickets": [{**t, "qr": make_qr(t["code"])} for t in tickets]}
+
+
+@api_router.get("/payments/gopay/notification")
+async def gopay_notification(id: str = Query(...)):
+    try:
+        await reconcile_payment(id)
+    except HTTPException as e:
+        if e.status_code == 404:
+            return {"ok": True}
+        raise HTTPException(502, "Reconciliation failed")
+    except Exception:
+        raise HTTPException(502, "Reconciliation failed")
+    return {"ok": True}
+
+
+@api_router.get("/payments/gopay/return")
+async def gopay_return(id: str = Query(...)):
+    try:
+        await reconcile_payment(id)
+    except Exception:
+        pass
+    order = await db.orders.find_one({"gopay_payment_id": str(id)})
+    dest = f"{SITE_URL}/success?order_id={order['id']}" if order else f"{SITE_URL}/success"
+    return RedirectResponse(dest)
+
+
+class SimActionIn(BaseModel):
+    order_id: str
+    action: str = ""
+
+
+@api_router.post("/payments/sim/action")
+async def sim_action(data: SimActionIn):
+    if gopay_configured():
+        raise HTTPException(404, "Not available")
+    state = {"paid": "PAID", "failed": "CANCELED", "cancelled": "CANCELED", "timeout": "TIMEOUTED"}.get(data.action)
+    if not state:
+        raise HTTPException(400, "Unknown action")
+    pid = f"SIM-{data.order_id}"
+    res = await db.sim_payments.update_one({"id": pid}, {"$set": {"state": state}})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Unknown order")
+    status = await reconcile_payment(pid)
+    return {"payment_status": status}
+
+
+@api_router.post("/payments/sim/notify")
+async def sim_notify(data: SimActionIn):
+    if gopay_configured():
+        raise HTTPException(404, "Not available")
+    status = await reconcile_payment(f"SIM-{data.order_id}")
+    return {"payment_status": status}
 
 
 class ContactIn(BaseModel):
@@ -261,7 +594,8 @@ async def scan_checkin(data: ScanIn, admin=Depends(get_current_admin)):
         return {"result": "used", "ticket": t}
     ts = utcnow().isoformat()
     await db.tickets.update_one({"id": t["id"]},
-                                {"$set": {"status": "used", "checked_in_at": ts}})
+                                {"$set": {"status": "used", "checked_in_at": ts,
+                                          "checked_in_by": admin.get("email")}})
     t["status"] = "used"
     t["checked_in_at"] = ts
     return {"result": "valid", "ticket": t}
@@ -291,6 +625,7 @@ async def admin_orders(admin=Depends(get_current_admin)):
     orders = await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(10000)
     for o in orders:
         o["tickets"] = await db.tickets.find({"order_id": o["id"]}, {"_id": 0}).to_list(50)
+        o["payment_status"] = o.get("payment_status") or o.get("status", "paid_mock")
     return orders
 
 
@@ -486,6 +821,8 @@ async def startup():
     await db.login_attempts.create_index("identifier")
     await db.tickets.create_index("code", unique=True)
     await db.tickets.create_index("order_id")
+    await db.sim_payments.create_index("id", unique=True)
+    await db.meta_events.create_index("event_id", unique=True)
     await seed_admin()
     await seed_event()
 

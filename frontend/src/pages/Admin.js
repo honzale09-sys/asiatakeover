@@ -106,7 +106,7 @@ function OrdersTab() {
         <table className="w-full text-sm" data-testid="orders-table">
           <thead>
             <tr className="border-b border-white/10 bg-[#0D0E15] font-mono2 text-[11px] uppercase tracking-[0.15em] text-slate-500">
-              {["Date", "Buyer", "Tier", "Qty", "Amount", "Ticket codes", "Status"].map((h) => (
+              {["Date", "Buyer", "Tier", "Qty", "Amount", "Ticket codes", "Payment", "Marketing"].map((h) => (
                 <th key={h} className="text-left px-4 py-3 whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -128,12 +128,31 @@ function OrdersTab() {
                   ))}
                 </td>
                 <td className="px-4 py-3">
-                  <span className="font-mono2 text-[11px] uppercase tracking-wider text-emerald-400">{o.status}</span>
+                  <span className={`font-mono2 text-[11px] uppercase tracking-wider ${
+                    o.payment_status === "paid" || o.payment_status === "paid_mock" ? "text-emerald-400"
+                    : o.payment_status === "created" || o.payment_status === "pending" ? "text-[#FFE600]"
+                    : o.payment_status === "refunded" || o.payment_status === "partially_refunded" ? "text-[#FF6A00]"
+                    : "text-[#FF0055]"
+                  }`} data-testid={`order-status-${o.id.slice(0, 8)}`}>{o.payment_status}</span>
+                  {o.paid_at && <p className="font-mono2 text-[10px] text-slate-600 mt-0.5">paid {new Date(o.paid_at).toLocaleString("cs-CZ")}</p>}
+                </td>
+                <td className="px-4 py-3 font-mono2 text-[11px] text-slate-400" data-testid={`order-marketing-${o.id.slice(0, 8)}`}>
+                  {(() => {
+                    const lt = o.attribution?.last_touch || {};
+                    const bits = [lt.utm_source, lt.utm_medium, lt.utm_campaign, lt.utm_content, lt.utm_term].filter(Boolean);
+                    const hasMeta = !!(o.attribution?.fbc || lt.fbclid);
+                    return (
+                      <>
+                        {bits.length > 0 ? <p>{bits.join(" / ")}</p> : <p className="text-slate-600">direct</p>}
+                        {hasMeta && <p className="text-[#00F0FF] mt-0.5">meta click ✓</p>}
+                      </>
+                    );
+                  })()}
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500 font-mono2 text-xs">No orders yet</td></tr>
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500 font-mono2 text-xs">No orders yet</td></tr>
             )}
           </tbody>
         </table>
