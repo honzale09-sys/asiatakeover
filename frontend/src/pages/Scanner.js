@@ -65,6 +65,12 @@ export default function Scanner() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!result) return;
+    const timer = setTimeout(() => setResult(null), 4000);
+    return () => clearTimeout(timer);
+  }, [result]);
+
   const checkin = async () => {
     if (!result?.ticket) return;
     try {
@@ -197,6 +203,8 @@ export default function Scanner() {
                 ? "border-white/10 bg-[#0D0E15]"
                 : result.result === "valid" || result.result === "admitted"
                 ? "border-emerald-400 bg-emerald-400/10 shadow-[0_0_40px_rgba(52,211,153,0.25)]"
+                : result.result === "refunded"
+                ? "border-[#FF6A00] bg-[#FF6A00]/10 shadow-[0_0_40px_rgba(255,106,0,0.25)]"
                 : "border-[#FF0055] bg-[#FF0055]/10 neon-shadow"
             }`}
           >
@@ -230,6 +238,14 @@ export default function Scanner() {
                 <p className="font-mono2 text-xs text-slate-400 mt-2">Ticket is now marked as used. Scan the next guest.</p>
               </div>
             )}
+            {result && result.result === "refunded" && t && (
+              <div data-testid="scan-result-refunded">
+                <XCircle size={44} className="text-[#FF6A00] mb-4" />
+                <p className="font-display font-black text-3xl uppercase text-[#FF6A00] mb-3">Refunded / Cancelled</p>
+                <p className="font-mono2 text-sm text-white">{t.code}</p>
+                <p className="font-mono2 text-sm text-slate-400 mt-2">This order was refunded or cancelled. Do not admit.</p>
+              </div>
+            )}
             {result && result.result === "used" && t && (
               <div data-testid="scan-result-used">
                 <XCircle size={44} className="text-[#FFE600] mb-4" />
@@ -238,6 +254,7 @@ export default function Scanner() {
                 <p className="text-slate-300 text-sm mt-1">{t.holder_name} · {t.tier_name}</p>
                 <p className="font-mono2 text-xs text-slate-400 mt-2">
                   Checked in at {t.checked_in_at ? new Date(t.checked_in_at).toLocaleString("cs-CZ") : "—"}
+                  {t.checked_in_by ? ` by ${t.checked_in_by}` : ""}
                 </p>
               </div>
             )}

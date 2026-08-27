@@ -1,11 +1,14 @@
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { getConsent, saveConsent } from "@/lib/tracking";
 
 export default function CookieBanner() {
+  const { pathname } = useLocation();
   const [visible, setVisible] = useState(() => !getConsent());
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [customizing, setCustomizing] = useState(false);
+  if (pathname.startsWith("/admin") || pathname.startsWith("/nascanujtobrasko")) return null;
   if (!visible) return null;
 
   const choose = (a, m) => {

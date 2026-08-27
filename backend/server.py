@@ -7,6 +7,7 @@ load_dotenv(ROOT_DIR / ".env")
 import base64
 import hashlib
 import io
+import ipaddress
 import logging
 import os
 import re
@@ -14,7 +15,10 @@ import secrets
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from html import escape
+from html.parser import HTMLParser
 from typing import List, Optional
+from urllib.parse import urlparse
 
 import bcrypt
 import httpx
@@ -329,6 +333,169 @@ async def send_capi_purchase(order: dict):
         logger.error("Meta CAPI send failed for order %s: %s", order["id"], type(e).__name__)
 
 
+# ---------------- transactional email (Emergent managed Resend) ----------------
+
+EMAIL_BASE_URL = "https://integrations.emergentagent.com"
+EMAIL_KEY = os.environ.get("EMERGENT_EMAIL_KEY", "")
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Asia Takeover")
+EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO") or None
+
+_SHORTENERS = ("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "goo.gl", "rebrand.ly")
+_CRED_ASK = ("reply with your password", "reply with the code", "send your password", "cvv",
+             "send us your password", "enter your password below", "confirm your card number",
+             "your full card number", "seed phrase", "recovery phrase", "verify your card",
+             "social security number", "confirm your bank details")
+_HOSTISH = re.compile(r"\b(?:https?://)?((?:[a-z0-9-]+\.)+[a-z]{2,})", re.I)
+
+
+def _host_ok(host: str) -> bool:
+    if not host or "xn--" in host:
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return False
+    except ValueError:
+        pass
+    return not any(host == s or host.endswith("." + s) for s in _SHORTENERS)
+
+
+def _same_site(shown: str, real: str) -> bool:
+    return shown == real or real.endswith("." + shown) or shown.endswith("." + real)
+
+
+class _EmailScan(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.tags, self.urls, self.anchors = set(), [], []
+        self._href, self._text = None, []
+
+    def handle_starttag(self, tag, attrs):
+        self.tags.add(tag.lower())
+        self.urls += [v for k, v in attrs if k.lower() in ("href", "src") and v]
+        if tag.lower() == "a":
+            self._href = dict((k.lower(), v) for k, v in attrs).get("href")
+            self._text = []
+
+    def handle_data(self, data):
+        if self._href is not None:
+            self._text.append(data)
+
+    def handle_endtag(self, tag):
+        if tag.lower() == "a" and self._href is not None:
+            self.anchors.append((self._href, "".join(self._text)))
+            self._href, self._text = None, []
+
+
+def _assert_safe_email(subject: str, html: str) -> None:
+    scan = _EmailScan()
+    scan.feed(html)
+    if scan.tags & {"form", "input", "textarea", "select"}:
+        raise ValueError("No forms or input fields in email")
+    body = f"{subject}\n{html}".lower()
+    for p in _CRED_ASK:
+        if p in body:
+            raise ValueError(f"Email asks recipient for credentials: {p!r}")
+    for url in scan.urls:
+        low = url.strip().lower()
+        if low.startswith(("mailto:", "tel:", "cid:", "#")):
+            continue
+        if not low.startswith("https://"):
+            raise ValueError(f"Email links/assets must be absolute https: {url!r}")
+        host = urlparse(low).hostname or ""
+        if not _host_ok(host) or urlparse(low).username is not None:
+            raise ValueError(f"Shortened, numeric-host or credential-bearing URL: {url!r}")
+    for href, text in scan.anchors:
+        real = urlparse(href.strip().lower()).hostname or ""
+        if not real:
+            continue
+        for m in _HOSTISH.finditer(text):
+            if not _same_site(m.group(1).lower(), real):
+                raise ValueError(f"Anchor text {m.group(1)!r} != real link host {real!r}")
+
+
+async def send_email(*, to: str, subject: str, html: str, reply_to: Optional[str] = None):
+    _assert_safe_email(subject, html)
+    payload = {"to": [to], "subject": subject, "html": html, "from_name": EMAIL_FROM_NAME}
+    if reply_to or EMAIL_REPLY_TO:
+        payload["contact_email"] = reply_to or EMAIL_REPLY_TO
+    async with httpx.AsyncClient(timeout=30) as c:
+        resp = await c.post(
+            f"{EMAIL_BASE_URL}/api/v1/email/send",
+            headers={"X-Email-Key": EMAIL_KEY},
+            json=payload,
+        )
+    resp.raise_for_status()
+    return resp.json().get("id")
+
+
+def build_ticket_email_html(order: dict, tickets: list) -> str:
+    n = len(tickets)
+    rows = ""
+    for i, t in enumerate(tickets, 1):
+        rows += (
+            f'<tr><td style="padding:28px 0;border-top:1px solid #262739;text-align:center">'
+            f'<p style="font-family:Courier New,monospace;letter-spacing:3px;color:#00F0FF;font-size:12px;margin:0 0 14px">'
+            f'TICKET {i} OF {n}</p>'
+            f'<img src="{SITE_URL}/api/qr/{t["code"]}.png" width="220" height="220" '
+            f'alt="QR code for ticket {escape(t["code"])}" '
+            f'style="display:block;margin:0 auto;border-radius:10px;background:#ffffff;padding:8px"/>'
+            f'<p style="font-family:Courier New,monospace;font-size:17px;font-weight:bold;color:#ffffff;margin:14px 0 2px">'
+            f'{escape(t["code"])}</p>'
+            f'<p style="font-size:12px;color:#94A3B8;margin:0">{escape(t["tier_name"])}</p>'
+            f'</td></tr>'
+        )
+    return (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#060609">'
+        '<tr><td align="center" style="padding:24px 12px">'
+        '<table role="presentation" width="600" cellpadding="0" cellspacing="0" '
+        'style="background:#0D0E15;border-radius:16px;overflow:hidden;max-width:600px;width:100%">'
+        f'<tr><td style="padding:32px 24px 8px;text-align:center">'
+        f'<img src="{SITE_URL}/assets/logo-atf.png" width="260" alt="ASIA TAKEOVER FESTIVAL" '
+        f'style="display:block;margin:0 auto;max-width:80%"/></td></tr>'
+        f'<tr><td style="padding:20px 32px;text-align:center">'
+        f'<p style="font-family:Courier New,monospace;letter-spacing:3px;color:#FF6A00;font-size:12px;margin:0 0 8px">PAYMENT CONFIRMED</p>'
+        f'<p style="font-size:15px;color:#ffffff;margin:0 0 6px">Your payment was successful — see you at the party.</p>'
+        f'<p style="font-size:13px;color:#94A3B8;margin:0">Asia Takeover · 27 September 2026 · DUPLEX, Wenceslas Square, Prague</p>'
+        f'</td></tr>'
+        f'<tr><td style="padding:0 32px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+        f'<tr><td style="padding:14px 0;border-top:1px solid #262739;font-size:13px;color:#94A3B8">'
+        f'Order <span style="font-family:Courier New,monospace;color:#ffffff">{escape(order["id"])}</span><br/>'
+        f'{escape(order["tier_name"])} × {order["quantity"]} · Total {order["amount_czk"]} CZK</td></tr>'
+        f'{rows}'
+        f'</table></td></tr>'
+        f'<tr><td style="padding:8px 32px 32px;text-align:center">'
+        f'<p style="font-size:13px;color:#ffffff;margin:18px 0 8px">Each QR code above is ONE individual entry.</p>'
+        f'<p style="font-size:12px;color:#94A3B8;line-height:1.7;margin:0">'
+        f'Do not share your QR codes publicly — anyone holding them can enter. '
+        f'Have the QR codes ready on your phone at the entrance. Doors open 20:00, 18+ with valid ID.</p>'
+        f'<p style="font-size:12px;margin:20px 0 0">'
+        f'<a href="{SITE_URL}/success?order_id={escape(order["id"])}" style="color:#00F0FF">View your tickets online</a></p>'
+        f'<p style="font-size:11px;color:#64748B;margin:24px 0 0">Sent by {escape(EMAIL_FROM_NAME)} · '
+        f'We never ask for your password or card details by email.</p>'
+        f'</td></tr></table></td></tr></table>'
+    )
+
+
+async def send_ticket_email(order: dict):
+    tickets = await db.tickets.find({"order_id": order["id"]}, {"_id": 0}).to_list(50)
+    if not tickets:
+        raise ValueError("No tickets for order")
+    subject = "Asia Takeover — Your Tickets 🎟️"
+    html = build_ticket_email_html(order, tickets)
+    return await send_email(to=order["buyer_email"], subject=subject, html=html)
+
+
+@api_router.get("/qr/{code}.png")
+async def qr_png(code: str):
+    clean = code.strip().upper()
+    if not re.fullmatch(r"ATF-[0-9A-F]{6}", clean):
+        raise HTTPException(404, "Unknown code")
+    img = qrcode.make(clean, box_size=10, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+
 # ---------------- fulfillment & reconciliation ----------------
 
 async def fulfill_order(order_id: str):
@@ -355,10 +522,20 @@ async def fulfill_order(order_id: str):
             "checked_in_at": None, "checked_in_by": None,
         })
     await send_capi_purchase(order)
-    logger.info(
-        "Order %s fulfilled: %d ticket(s) issued (email provider not configured — confirmation email pending)",
-        order["id"], order["quantity"],
-    )
+    try:
+        email_id = await send_ticket_email(order)
+        await db.orders.update_one(
+            {"id": order_id},
+            {"$set": {"ticket_email_sent_at": utcnow().isoformat(),
+                      "ticket_email_id": email_id, "ticket_email_error": None}},
+        )
+    except Exception as e:
+        logger.error("Ticket email failed for order %s: %s", order_id, type(e).__name__)
+        await db.orders.update_one(
+            {"id": order_id},
+            {"$set": {"ticket_email_error": type(e).__name__}},
+        )
+    logger.info("Order %s fulfilled: %d ticket(s) issued", order["id"], order["quantity"])
 
 
 async def provider_status(payment_id: str):
@@ -530,7 +707,8 @@ class SimActionIn(BaseModel):
 async def sim_action(data: SimActionIn):
     if gopay_configured():
         raise HTTPException(404, "Not available")
-    state = {"paid": "PAID", "failed": "CANCELED", "cancelled": "CANCELED", "timeout": "TIMEOUTED"}.get(data.action)
+    state = {"paid": "PAID", "failed": "CANCELED", "cancelled": "CANCELED",
+             "timeout": "TIMEOUTED", "refunded": "REFUNDED"}.get(data.action)
     if not state:
         raise HTTPException(400, "Unknown action")
     pid = f"SIM-{data.order_id}"
@@ -570,11 +748,22 @@ class ScanIn(BaseModel):
     code: str
 
 
-async def find_ticket(code: str):
-    clean = code.strip().upper()
+def normalize_code(code: str) -> str:
+    clean = (code or "").strip().upper()
     if "ATF-" in clean:
         clean = clean[clean.index("ATF-"):]
-    return await db.tickets.find_one({"code": clean}, {"_id": 0})
+    return clean
+
+
+async def find_ticket(code: str):
+    return await db.tickets.find_one({"code": normalize_code(code)}, {"_id": 0})
+
+
+async def order_status_for(ticket: dict) -> str:
+    order = await db.orders.find_one({"id": ticket["order_id"]}, {"_id": 0})
+    if not order:
+        return "paid_mock"
+    return order.get("payment_status") or order.get("status", "paid_mock")
 
 
 @api_router.post("/scan/lookup")
@@ -582,23 +771,38 @@ async def scan_lookup(data: ScanIn, admin=Depends(get_current_admin)):
     t = await find_ticket(data.code)
     if not t:
         return {"result": "invalid", "ticket": None}
+    order_status = await order_status_for(t)
+    if t["status"] == "refunded" or order_status in ("refunded", "partially_refunded"):
+        return {"result": "refunded", "ticket": t}
+    if order_status not in ("paid", "paid_mock"):
+        return {"result": "invalid", "ticket": t}
     return {"result": t["status"], "ticket": t}
 
 
 @api_router.post("/scan/checkin")
 async def scan_checkin(data: ScanIn, admin=Depends(get_current_admin)):
-    t = await find_ticket(data.code)
-    if not t:
-        return {"result": "invalid", "ticket": None}
-    if t["status"] == "used":
-        return {"result": "used", "ticket": t}
+    code = normalize_code(data.code)
     ts = utcnow().isoformat()
-    await db.tickets.update_one({"id": t["id"]},
-                                {"$set": {"status": "used", "checked_in_at": ts,
-                                          "checked_in_by": admin.get("email")}})
-    t["status"] = "used"
-    t["checked_in_at"] = ts
-    return {"result": "valid", "ticket": t}
+    t = await db.tickets.find_one_and_update(
+        {"code": code, "status": "valid"},
+        {"$set": {"status": "used", "checked_in_at": ts,
+                  "checked_in_by": admin.get("email")}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if t:
+        t.pop("_id", None)
+        order_status = await order_status_for(t)
+        if order_status in ("refunded", "partially_refunded"):
+            await db.tickets.update_one({"id": t["id"]}, {"$set": {"status": "refunded"}})
+            t["status"] = "refunded"
+            return {"result": "refunded", "ticket": t}
+        return {"result": "valid", "ticket": t}
+    existing = await db.tickets.find_one({"code": code}, {"_id": 0})
+    if not existing:
+        return {"result": "invalid", "ticket": None}
+    if existing["status"] == "refunded":
+        return {"result": "refunded", "ticket": existing}
+    return {"result": "used", "ticket": existing}
 
 
 # ---------------- admin ----------------
@@ -627,6 +831,27 @@ async def admin_orders(admin=Depends(get_current_admin)):
         o["tickets"] = await db.tickets.find({"order_id": o["id"]}, {"_id": 0}).to_list(50)
         o["payment_status"] = o.get("payment_status") or o.get("status", "paid_mock")
     return orders
+
+
+@api_router.post("/admin/orders/{order_id}/resend-email")
+async def resend_ticket_email(order_id: str, admin=Depends(get_current_admin)):
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if (order.get("payment_status") or order.get("status")) not in ("paid", "paid_mock"):
+        raise HTTPException(400, "Ticket emails can only be resent for paid orders")
+    try:
+        email_id = await send_ticket_email(order)
+        await db.orders.update_one(
+            {"id": order_id},
+            {"$set": {"ticket_email_sent_at": utcnow().isoformat(),
+                      "ticket_email_id": email_id, "ticket_email_error": None}},
+        )
+        return {"ok": True, "email_id": email_id}
+    except Exception as e:
+        await db.orders.update_one(
+            {"id": order_id}, {"$set": {"ticket_email_error": type(e).__name__}})
+        raise HTTPException(502, "Email send failed")
 
 
 @api_router.get("/admin/messages")

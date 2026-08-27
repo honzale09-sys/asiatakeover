@@ -60,9 +60,18 @@ function OverviewTab() {
 function OrdersTab() {
   const [orders, setOrders] = useState([]);
   const [q, setQ] = useState("");
-  useEffect(() => {
-    api.get("/admin/orders").then((r) => setOrders(r.data)).catch((e) => toast.error(formatError(e)));
-  }, []);
+  const load = () => api.get("/admin/orders").then((r) => setOrders(r.data)).catch((e) => toast.error(formatError(e)));
+  useEffect(() => { load(); }, []);
+
+  const resend = async (id) => {
+    try {
+      await api.post(`/admin/orders/${id}/resend-email`);
+      toast.success("Ticket email resent (same tickets)");
+      load();
+    } catch (e) {
+      toast.error(formatError(e));
+    }
+  };
 
   const filtered = orders.filter((o) => {
     const hay = `${o.buyer_name} ${o.buyer_email} ${o.tier_name} ${o.tickets.map((t) => t.code).join(" ")}`.toLowerCase();
@@ -106,7 +115,7 @@ function OrdersTab() {
         <table className="w-full text-sm" data-testid="orders-table">
           <thead>
             <tr className="border-b border-white/10 bg-[#0D0E15] font-mono2 text-[11px] uppercase tracking-[0.15em] text-slate-500">
-              {["Date", "Buyer", "Tier", "Qty", "Amount", "Ticket codes", "Payment", "Marketing"].map((h) => (
+              {["Date", "Buyer", "Tier", "Qty", "Amount", "Ticket codes", "Payment", "Marketing", "Ticket email"].map((h) => (
                 <th key={h} className="text-left px-4 py-3 whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -135,6 +144,7 @@ function OrdersTab() {
                     : "text-[#FF0055]"
                   }`} data-testid={`order-status-${o.id.slice(0, 8)}`}>{o.payment_status}</span>
                   {o.paid_at && <p className="font-mono2 text-[10px] text-slate-600 mt-0.5">paid {new Date(o.paid_at).toLocaleString("cs-CZ")}</p>}
+                  {o.gopay_payment_id && <p className="font-mono2 text-[10px] text-slate-600">gw {o.gopay_payment_id}</p>}
                 </td>
                 <td className="px-4 py-3 font-mono2 text-[11px] text-slate-400" data-testid={`order-marketing-${o.id.slice(0, 8)}`}>
                   {(() => {
@@ -149,10 +159,28 @@ function OrdersTab() {
                     );
                   })()}
                 </td>
+                <td className="px-4 py-3 font-mono2 text-[11px]" data-testid={`order-email-${o.id.slice(0, 8)}`}>
+                  {o.ticket_email_sent_at ? (
+                    <span className="text-emerald-400">sent {new Date(o.ticket_email_sent_at).toLocaleString("cs-CZ")}</span>
+                  ) : o.ticket_email_error ? (
+                    <span className="text-[#FF0055]">error: {o.ticket_email_error}</span>
+                  ) : (
+                    <span className="text-slate-600">—</span>
+                  )}
+                  {(o.payment_status === "paid" || o.payment_status === "paid_mock") && (
+                    <button
+                      onClick={() => resend(o.id)}
+                      data-testid={`resend-email-${o.id.slice(0, 8)}`}
+                      className="block mt-1 text-[#00F0FF] hover:underline"
+                    >
+                      resend tickets
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500 font-mono2 text-xs">No orders yet</td></tr>
+              <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500 font-mono2 text-xs">No orders yet</td></tr>
             )}
           </tbody>
         </table>
