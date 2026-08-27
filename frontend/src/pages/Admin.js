@@ -339,7 +339,11 @@ function TiersTab() {
 
   const load = () => {
     api.get("/admin/tiers").then((r) => setTiers(r.data)).catch((e) => toast.error(formatError(e)));
-    api.get("/admin/events").then((r) => setEvents(r.data)).catch(() => {});
+    api.get("/admin/events").then((r) => {
+      setEvents(r.data);
+      const active = r.data.find((ev) => ev.active) || r.data[0];
+      if (active) setForm((f) => (f.event_id ? f : { ...f, event_id: active.id }));
+    }).catch(() => {});
   };
   useEffect(() => { load(); }, []);
 
