@@ -59,7 +59,7 @@ export default function Landing() {
     <div className="relative bg-[#060609] text-white min-h-screen" data-testid="landing-page">
       <div className="noise-bg fixed inset-0 z-[60] pointer-events-none opacity-[0.05]" />
       <Navbar />
-      <Hero event={data.event} />
+      <Hero event={data.event} tiers={data.tiers} />
       <Gallery />
       <Footer event={data.event} content={data.content} />
     </div>
