@@ -599,6 +599,19 @@ async def create_order(data: OrderCreateIn, request: Request):
     tier = await db.ticket_tiers.find_one({"id": data.tier_id}, {"_id": 0})
     if not tier or tier["event_id"] != event["id"]:
         raise HTTPException(404, "Ticket tier not found")
+    if "VIP" not in tier["name"].upper():
+        ga_tiers = await db.ticket_tiers.find({"event_id": event["id"]}).to_list(100)
+        ga_tiers = [t for t in ga_tiers if "VIP" not in t["name"].upper()]
+        ga_tiers.sort(key=lambda t: t["price_czk"])
+        active_id = None
+        for t in ga_tiers:
+            if await db.tickets.count_documents({"tier_id": t["id"]}) < t["capacity"]:
+                active_id = t["id"]
+                break
+        if active_id is None:
+            raise HTTPException(400, "All releases are sold out")
+        if tier["id"] != active_id:
+            raise HTTPException(400, "This release is not on sale yet")
     sold = await db.tickets.count_documents({"tier_id": tier["id"]})
     if sold + data.quantity > tier["capacity"]:
         raise HTTPException(400, "Not enough tickets left in this tier")
