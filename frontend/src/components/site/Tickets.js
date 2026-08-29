@@ -101,6 +101,13 @@ function CheckoutModal({ tier, event, onClose }) {
             <p className="font-mono2 text-[11px] text-slate-500 mt-3 text-center">
               You'll be redirected to the payment gateway. Tickets are issued only after the payment is confirmed.
             </p>
+            <p className="font-mono2 text-[10px] text-slate-600 mt-2 text-center">
+              By continuing you agree to our{" "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#00F0FF] hover:underline">
+                Terms & Conditions
+              </a>
+              .
+            </p>
           </form>
         )}
 

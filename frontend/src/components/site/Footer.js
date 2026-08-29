@@ -15,8 +15,8 @@ export default function Footer({ event, content }) {
           {event?.address || "Václavské náměstí 831/21, Praha 1"}
         </p>
         <p>
-          <a href={`mailto:${content?.contact_email || "info@asiatakeover.eu"}`} className="hover:text-white transition-colors" data-testid="footer-email-link">
-            {content?.contact_email || "info@asiatakeover.eu"}
+          <a href={`mailto:${content?.contact_email || "jalimaks@seznam.cz"}`} className="hover:text-white transition-colors" data-testid="footer-email-link">
+            {content?.contact_email || "jalimaks@seznam.cz"}
           </a>
           {"  ·  "}
           <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors" data-testid="footer-instagram-link">
