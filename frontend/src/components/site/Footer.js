@@ -25,6 +25,8 @@ export default function Footer({ event, content }) {
         </p>
       </div>
       <div className="flex gap-6 font-mono2 text-[10px] uppercase tracking-[0.25em] text-white/30">
+        <a href="/contact" data-testid="footer-contact-link" className="hover:text-white transition-colors">Contact</a>
+        <a href="/terms" data-testid="footer-terms-link" className="hover:text-white transition-colors">Terms</a>
         <a href="/nascanujtobrasko" data-testid="footer-scanner-link" className="hover:text-white transition-colors">Door Staff</a>
         <a href="/admin" data-testid="footer-admin-link" className="hover:text-white transition-colors">Admin</a>
       </div>

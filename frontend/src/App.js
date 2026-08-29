@@ -5,6 +5,8 @@ import Landing from "@/pages/Landing";
 import TicketsPage from "@/pages/TicketsPage";
 import Success from "@/pages/Success";
 import PaySim from "@/pages/PaySim";
+import Terms from "@/pages/Terms";
+import ContactPage from "@/pages/ContactPage";
 import Admin from "@/pages/Admin";
 import Scanner from "@/pages/Scanner";
 import CookieBanner from "@/components/CookieBanner";
@@ -34,6 +36,8 @@ export default function App() {
         <Route path="/tickets" element={<TicketsPage />} />
         <Route path="/success" element={<Success />} />
         <Route path="/pay/:orderId" element={<PaySim />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/nascanujtobrasko" element={<Scanner />} />
       </Routes>
