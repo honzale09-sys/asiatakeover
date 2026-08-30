@@ -752,6 +752,26 @@ async def gate(data: GateIn):
     raise HTTPException(401, "Wrong password")
 
 
+@api_router.get("/gate/status")
+async def gate_status():
+    doc = await db.settings.find_one({"key": "lockdown"}, {"_id": 0})
+    return {"enabled": (doc or {}).get("enabled", True)}
+
+
+class LockdownIn(BaseModel):
+    enabled: bool
+
+
+@api_router.put("/admin/lockdown")
+async def set_lockdown(data: LockdownIn, admin=Depends(get_current_admin)):
+    await db.settings.update_one(
+        {"key": "lockdown"},
+        {"$set": {"key": "lockdown", "enabled": data.enabled}},
+        upsert=True,
+    )
+    return {"enabled": data.enabled}
+
+
 class ContactIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr

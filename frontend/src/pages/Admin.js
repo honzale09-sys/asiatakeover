@@ -433,6 +433,7 @@ function TiersTab() {
 
 function ContentTab() {
   const [form, setForm] = useState({ announcement: "", hero_sub: "", contact_email: "", instagram: "" });
+  const [lockdown, setLockdown] = useState(true);
   useEffect(() => {
     api.get("/site").then((r) => {
       const c = r.data.content || {};
@@ -441,13 +442,15 @@ function ContentTab() {
         contact_email: c.contact_email || "", instagram: c.instagram || "",
       });
     }).catch(() => {});
+    api.get("/gate/status").then((r) => setLockdown(r.data.enabled)).catch(() => {});
   }, []);
 
   const save = async (e) => {
     e.preventDefault();
     try {
       await api.put("/admin/content", form);
-      toast.success("Site content updated — live on the landing page now");
+      await api.put("/admin/lockdown", { enabled: lockdown });
+      toast.success(lockdown ? "Saved — site stays locked" : "Saved — SITE IS NOW PUBLIC");
     } catch (e2) {
       toast.error(formatError(e2));
     }
@@ -456,6 +459,22 @@ function ContentTab() {
   return (
     <form onSubmit={save} className={`${cardCls} max-w-2xl space-y-5`} data-testid="content-form">
       <p className="font-display font-bold uppercase">Edit site content</p>
+      <label className="flex items-center justify-between gap-4 border border-white/10 rounded-xl px-4 py-3.5" data-testid="lockdown-toggle-row">
+        <div>
+          <p className="font-mono2 text-xs uppercase tracking-[0.2em] text-white">Site lockdown</p>
+          <p className="font-mono2 text-[11px] text-slate-500 mt-1">
+            {lockdown ? "Visitors see the password page" : "Site is open to the public"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setLockdown(!lockdown)}
+          data-testid="lockdown-toggle"
+          className={`relative w-14 h-8 rounded-full transition-colors duration-300 shrink-0 ${lockdown ? "bg-[#FF0055]" : "bg-emerald-500"}`}
+        >
+          <span className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all duration-300 ${lockdown ? "left-1" : "left-7"}`} />
+        </button>
+      </label>
       <div>
         <label className={labelCls}>Announcement (marquee ribbon)</label>
         <input className={inputCls} value={form.announcement} onChange={(e) => setForm({ ...form, announcement: e.target.value })} data-testid="content-announcement-input" />

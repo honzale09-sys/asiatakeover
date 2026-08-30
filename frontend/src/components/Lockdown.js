@@ -1,13 +1,26 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { api } from "@/api";
 
 export default function Lockdown({ children }) {
+  const [enabled, setEnabled] = useState(null);
   const [unlocked, setUnlocked] = useState(() => localStorage.getItem("atf_unlocked") === "1");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    api
+      .get("/gate/status")
+      .then((r) => {
+        setEnabled(r.data.enabled);
+        if (!r.data.enabled) window.dispatchEvent(new Event("atf-unlock"));
+      })
+      .catch(() => setEnabled(true));
+  }, []);
+
+  if (enabled === null) return <div className="min-h-screen bg-white" data-testid="lockdown-loading" />;
+  if (enabled === false) return children;
   if (unlocked) return children;
 
   const submit = async (e) => {
