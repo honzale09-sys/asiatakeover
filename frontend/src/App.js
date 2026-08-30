@@ -10,6 +10,7 @@ import ContactPage from "@/pages/ContactPage";
 import Admin from "@/pages/Admin";
 import Scanner from "@/pages/Scanner";
 import CookieBanner from "@/components/CookieBanner";
+import Lockdown from "@/components/Lockdown";
 import { captureAttribution, initPixel, marketingAllowed, trackEvent } from "@/lib/tracking";
 
 function RouteTracker() {
@@ -32,12 +33,12 @@ export default function App() {
       <RouteTracker />
       <CookieBanner />
       <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/tickets" element={<TicketsPage />} />
-        <Route path="/success" element={<Success />} />
-        <Route path="/pay/:orderId" element={<PaySim />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/" element={<Lockdown><Landing /></Lockdown>} />
+        <Route path="/tickets" element={<Lockdown><TicketsPage /></Lockdown>} />
+        <Route path="/success" element={<Lockdown><Success /></Lockdown>} />
+        <Route path="/pay/:orderId" element={<Lockdown><PaySim /></Lockdown>} />
+        <Route path="/terms" element={<Lockdown><Terms /></Lockdown>} />
+        <Route path="/contact" element={<Lockdown><ContactPage /></Lockdown>} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/nascanujtobrasko" element={<Scanner />} />
       </Routes>

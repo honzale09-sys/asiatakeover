@@ -1,13 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { getConsent, saveConsent } from "@/lib/tracking";
 
 export default function CookieBanner() {
   const { pathname } = useLocation();
   const [visible, setVisible] = useState(() => !getConsent());
+  const [unlocked, setUnlocked] = useState(() => localStorage.getItem("atf_unlocked") === "1");
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [customizing, setCustomizing] = useState(false);
+
+  useEffect(() => {
+    const h = () => setUnlocked(true);
+    window.addEventListener("atf-unlock", h);
+    return () => window.removeEventListener("atf-unlock", h);
+  }, []);
+
+  if (!unlocked) return null;
   if (pathname.startsWith("/admin") || pathname.startsWith("/nascanujtobrasko")) return null;
   if (!visible) return null;
 

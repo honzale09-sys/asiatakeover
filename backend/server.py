@@ -740,6 +740,18 @@ async def sim_notify(data: SimActionIn):
     return {"payment_status": status}
 
 
+class GateIn(BaseModel):
+    password: str
+
+
+@api_router.post("/gate")
+async def gate(data: GateIn):
+    pw = os.environ.get("LOCKDOWN_PASSWORD", "")
+    if pw and data.password == pw:
+        return {"ok": True}
+    raise HTTPException(401, "Wrong password")
+
+
 class ContactIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
