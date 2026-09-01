@@ -17,6 +17,8 @@ export default function Hero({ event, tiers = [] }) {
         <video
           ref={(v) => {
             if (v) {
+              v.setAttribute("muted", "");
+              v.setAttribute("webkit-playsinline", "");
               v.muted = true;
               v.defaultMuted = true;
               v.play().catch(() => {});
@@ -26,6 +28,7 @@ export default function Hero({ event, tiers = [] }) {
           muted
           loop
           playsInline
+          webkit-playsinline="true"
           disablePictureInPicture
           preload="auto"
           poster="/assets/hero-poster.jpg"
