@@ -23,7 +23,7 @@ export default function Footer() {
         <div>
           <p className="font-display font-bold text-sm uppercase mb-5">Follow Us</p>
           <a
-            href="https://instagram.com"
+            href="https://instagram.com/asiatakeover_prague"
             target="_blank"
             rel="noopener noreferrer"
             data-testid="footer-instagram-link"

@@ -36,7 +36,7 @@ export default function ContactPage() {
             </div>
           </a>
           <a
-            href="https://instagram.com"
+            href="https://instagram.com/asiatakeover_prague"
             target="_blank"
             rel="noopener noreferrer"
             data-testid="contact-instagram-card"
@@ -45,7 +45,7 @@ export default function ContactPage() {
             <Instagram size={22} className="text-[#00F0FF] shrink-0" />
             <div>
               <p className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-500">Instagram</p>
-              <p className="font-medium mt-1">@asiatakeover.prague</p>
+              <p className="font-medium mt-1">@asiatakeover_prague</p>
             </div>
           </a>
           <div className="flex items-center gap-4 border border-white/10 rounded-2xl bg-[#0D0E15] p-6" data-testid="contact-venue-card">
