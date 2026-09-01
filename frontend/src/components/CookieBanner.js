@@ -1,16 +1,31 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { api } from "@/api";
 import { getConsent, saveConsent } from "@/lib/tracking";
 
 export default function CookieBanner() {
   const { pathname } = useLocation();
   const [visible, setVisible] = useState(() => !getConsent());
-  const [unlocked, setUnlocked] = useState(() => localStorage.getItem("atf_unlocked") === "1");
+  const [unlocked, setUnlocked] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [customizing, setCustomizing] = useState(false);
 
   useEffect(() => {
+    const check = () => {
+      api
+        .get("/gate/status")
+        .then((r) => {
+          if (!r.data.enabled) return setUnlocked(true);
+          const s = r.data.since || 0;
+          setUnlocked(
+            localStorage.getItem("atf_unlocked") === "1" &&
+              Number(localStorage.getItem("atf_unlocked_at") || 0) >= s
+          );
+        })
+        .catch(() => setUnlocked(localStorage.getItem("atf_unlocked") === "1"));
+    };
+    check();
     const h = () => setUnlocked(true);
     window.addEventListener("atf-unlock", h);
     return () => window.removeEventListener("atf-unlock", h);

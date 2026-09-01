@@ -4,7 +4,8 @@ import { api } from "@/api";
 
 export default function Lockdown({ children }) {
   const [enabled, setEnabled] = useState(null);
-  const [unlocked, setUnlocked] = useState(() => localStorage.getItem("atf_unlocked") === "1");
+  const [since, setSince] = useState(0);
+  const [unlocked, setUnlocked] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -14,7 +15,17 @@ export default function Lockdown({ children }) {
       .get("/gate/status")
       .then((r) => {
         setEnabled(r.data.enabled);
-        if (!r.data.enabled) window.dispatchEvent(new Event("atf-unlock"));
+        const s = r.data.since || 0;
+        setSince(s);
+        if (!r.data.enabled) {
+          window.dispatchEvent(new Event("atf-unlock"));
+          return;
+        }
+        const ok =
+          localStorage.getItem("atf_unlocked") === "1" &&
+          Number(localStorage.getItem("atf_unlocked_at") || 0) >= s;
+        setUnlocked(ok);
+        if (ok) window.dispatchEvent(new Event("atf-unlock"));
       })
       .catch(() => setEnabled(true));
   }, []);
@@ -30,6 +41,7 @@ export default function Lockdown({ children }) {
     try {
       await api.post("/gate", { password });
       localStorage.setItem("atf_unlocked", "1");
+      localStorage.setItem("atf_unlocked_at", String(Date.now()));
       window.dispatchEvent(new Event("atf-unlock"));
       setUnlocked(true);
     } catch {

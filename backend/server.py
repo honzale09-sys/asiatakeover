@@ -755,7 +755,8 @@ async def gate(data: GateIn):
 @api_router.get("/gate/status")
 async def gate_status():
     doc = await db.settings.find_one({"key": "lockdown"}, {"_id": 0})
-    return {"enabled": (doc or {}).get("enabled", True)}
+    doc = doc or {}
+    return {"enabled": doc.get("enabled", True), "since": doc.get("since", 0)}
 
 
 class LockdownIn(BaseModel):
@@ -764,12 +765,11 @@ class LockdownIn(BaseModel):
 
 @api_router.put("/admin/lockdown")
 async def set_lockdown(data: LockdownIn, admin=Depends(get_current_admin)):
-    await db.settings.update_one(
-        {"key": "lockdown"},
-        {"$set": {"key": "lockdown", "enabled": data.enabled}},
-        upsert=True,
-    )
-    return {"enabled": data.enabled}
+    doc = {"key": "lockdown", "enabled": data.enabled}
+    if data.enabled:
+        doc["since"] = int(time.time() * 1000)
+    await db.settings.update_one({"key": "lockdown"}, {"$set": doc}, upsert=True)
+    return {"enabled": data.enabled, "since": doc.get("since")}
 
 
 class ContactIn(BaseModel):
