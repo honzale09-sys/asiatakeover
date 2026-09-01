@@ -54,7 +54,23 @@ export default function Lockdown({ children }) {
   return (
     <div className="relative min-h-screen bg-[#060609] flex flex-col items-center justify-center px-6 overflow-hidden" data-testid="lockdown-page">
       <div className="absolute inset-0 z-0">
-        <video autoPlay muted loop playsInline preload="auto" poster="/assets/hero-poster.jpg" className="w-full h-full object-cover">
+        <video
+          ref={(v) => {
+            if (v) {
+              v.muted = true;
+              v.defaultMuted = true;
+              v.play().catch(() => {});
+            }
+          }}
+          autoPlay
+          muted
+          loop
+          playsInline
+          disablePictureInPicture
+          preload="auto"
+          poster="/assets/hero-poster.jpg"
+          className="w-full h-full object-cover"
+        >
           <source src="/assets/hero-bg.webm" type="video/webm" />
           <source src="/assets/hero-bg.mp4" type="video/mp4" />
         </video>

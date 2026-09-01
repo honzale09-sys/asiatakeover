@@ -15,10 +15,18 @@ export default function Hero({ event, tiers = [] }) {
     <section className="relative h-screen h-[100svh] overflow-hidden" data-testid="hero-section">
       <div className="absolute inset-0 z-0">
         <video
+          ref={(v) => {
+            if (v) {
+              v.muted = true;
+              v.defaultMuted = true;
+              v.play().catch(() => {});
+            }
+          }}
           autoPlay
           muted
           loop
           playsInline
+          disablePictureInPicture
           preload="auto"
           poster="/assets/hero-poster.jpg"
           className="w-full h-full object-cover"
