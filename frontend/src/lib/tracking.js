@@ -20,6 +20,7 @@ export function saveConsent({ analytics = false, marketing = false }) {
     JSON.stringify({ necessary: true, analytics, marketing, ts: Date.now() })
   );
   if (marketing) initPixel();
+  if (analytics || marketing) initGTM();
 }
 
 export function getCookie(name) {
@@ -47,6 +48,17 @@ export function initPixel() {
   n("consent", "grant");
   n("init", pixelId);
   n("track", "PageView");
+}
+
+export function initGTM() {
+  const id = process.env.REACT_APP_GTM_ID;
+  if (!id || document.querySelector('script[src*="googletagmanager.com/gtm.js"]')) return;
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js" });
+  const s = document.createElement("script");
+  s.async = true;
+  s.src = `https://www.googletagmanager.com/gtm.js?id=${id}`;
+  document.head.appendChild(s);
 }
 
 export function trackEvent(name, data = {}, eventID = null) {

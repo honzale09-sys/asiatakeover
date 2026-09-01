@@ -13,12 +13,14 @@ import Admin from "@/pages/Admin";
 import Scanner from "@/pages/Scanner";
 import CookieBanner from "@/components/CookieBanner";
 import Lockdown from "@/components/Lockdown";
-import { captureAttribution, initPixel, marketingAllowed, trackEvent } from "@/lib/tracking";
+import { captureAttribution, getConsent, initGTM, initPixel, marketingAllowed, trackEvent } from "@/lib/tracking";
 
 function RouteTracker() {
   const loc = useLocation();
   useEffect(() => {
     captureAttribution();
+    const c = getConsent();
+    if (c?.analytics || c?.marketing) initGTM();
     if (marketingAllowed()) {
       const alreadyLoaded = !!window.fbq;
       initPixel();
