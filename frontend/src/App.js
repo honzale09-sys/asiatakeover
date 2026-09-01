@@ -7,6 +7,8 @@ import Success from "@/pages/Success";
 import PaySim from "@/pages/PaySim";
 import Terms from "@/pages/Terms";
 import ContactPage from "@/pages/ContactPage";
+import FaqPage from "@/pages/FaqPage";
+import PrivacyPage from "@/pages/PrivacyPage";
 import Admin from "@/pages/Admin";
 import Scanner from "@/pages/Scanner";
 import CookieBanner from "@/components/CookieBanner";
@@ -39,6 +41,8 @@ export default function App() {
         <Route path="/pay/:orderId" element={<Lockdown><PaySim /></Lockdown>} />
         <Route path="/terms" element={<Lockdown><Terms /></Lockdown>} />
         <Route path="/contact" element={<Lockdown><ContactPage /></Lockdown>} />
+        <Route path="/faq" element={<Lockdown><FaqPage /></Lockdown>} />
+        <Route path="/privacy" element={<Lockdown><PrivacyPage /></Lockdown>} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/nascanujtobrasko" element={<Scanner />} />
       </Routes>
