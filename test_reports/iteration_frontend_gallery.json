@@ -1,0 +1,26 @@
+{
+  "summary": "Frontend-only testing of Upcoming Events home section + Gallery page split. All 8 acceptance criteria pass. Home shows the Upcoming Events section with festival poster (loads OK, 1122x1402), FESTIVAL badge, date/venue caption ('27.09.2026 • DUPLEX Prague') and 'Get Tickets →' CTA. Clicking the poster navigates to /tickets. Home no longer contains map-section/map-image. /gallery renders Navbar + 'The Map' section with floorplan.png (HTTP 200, ~2.2MB) + Footer. Desktop nav Gallery/Events/Contact links work; mobile hamburger opens dropdown, mobile Gallery link navigates and closes menu. Footer Gallery quick link navigates to /gallery. Lockdown gate shows in fresh context and unlocking with the .env password grants access.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/gallery", "issues": ["floorplan.png is served as a ~2.2MB PNG. It renders fine but consider compressing/converting to WebP for faster load, especially on mobile."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Landing.js UpcomingEvents: poster uses fixed max-w-sm on desktop which keeps the card small and left-aligned as intended per reference — matches spec.",
+    "GalleryPage.js: floorplan image is ~2.2MB; add loading='lazy' or serve a compressed/WebP version for perf.",
+    "Consider adding an alt/skeleton state while the large floorplan image loads."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "Lockdown password: read from /app/backend/.env (LOCKDOWN_PASSWORD). Successfully verified unlock works.",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All navigation, section presence, image loads, mobile menu, footer link, and lockdown gate flows verified end-to-end on the preview URL. Only optional perf note: /assets/floorplan.png is 2.2MB.",
+  "rca of the issue": "n/a — no functional issues found."
+}

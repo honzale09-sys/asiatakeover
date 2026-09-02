@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import Lenis from "lenis";
 import { api } from "@/api";
 import Navbar from "@/components/site/Navbar";
@@ -24,23 +25,39 @@ const FALLBACK = {
   },
 };
 
-function MapSection() {
+function UpcomingEvents({ event }) {
   return (
-    <section id="gallery" className="px-4 sm:px-8 lg:px-16 py-16 lg:py-24 bg-[#0B0C12] border-y border-white/5" data-testid="map-section">
+    <section className="px-4 sm:px-8 lg:px-16 py-16 lg:py-24 bg-[#0B0C12] border-y border-white/5" data-testid="upcoming-events-section">
       <Reveal>
-        <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-4">Gallery</p>
-        <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-tight mb-4">
-          The <span className="text-[#FF0055]">Map</span>
+        <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-4">Save the date</p>
+        <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-tight mb-10">
+          Upcoming <span className="text-[#FF0055]">Events</span>
         </h2>
-        <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-slate-500 mb-8">
-          KPOP Room <span className="text-[#FF0055]">•</span> Mainstream Room <span className="text-[#FF0055]">•</span> Saigon Room
-        </p>
-        <img
-          src="/assets/floorplan.png"
-          alt="DUPLEX floor map — KPOP Room, Mainstream Room, Saigon Room"
-          className="w-full rounded-2xl border border-white/10"
-          data-testid="map-image"
-        />
+        <Link
+          to="/tickets"
+          data-testid="upcoming-event-poster-link"
+          className="group block w-full max-w-sm"
+        >
+          <span className="relative block rounded-2xl overflow-hidden border border-white/10 transition-transform duration-300 group-hover:-translate-y-1">
+            <img
+              src="/assets/poster-festival.jpg"
+              alt={`${event?.name || "ASIA TAKEOVER FESTIVAL"} — 27.09.2026, DUPLEX Prague`}
+              className="w-full aspect-[4/5] object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+              data-testid="upcoming-event-poster"
+            />
+            <span className="absolute top-3 left-3 font-mono2 text-[10px] uppercase tracking-[0.2em] bg-[#FF0055] text-white px-2.5 py-1 rounded-md" data-testid="upcoming-event-badge">
+              Festival
+            </span>
+          </span>
+          <span className="mt-4 flex items-center justify-between gap-4">
+            <span className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-white/60" data-testid="upcoming-event-meta">
+              {event?.date_label || "27.09.2026"} <span className="text-[#FF0055]">•</span> {event?.venue || "DUPLEX"} {event?.city || "Prague"}
+            </span>
+            <span className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-[#FF6A00] whitespace-nowrap group-hover:text-white transition-colors" data-testid="upcoming-event-cta">
+              Get Tickets →
+            </span>
+          </span>
+        </Link>
       </Reveal>
     </section>
   );
@@ -77,7 +94,7 @@ export default function Landing() {
       <div className="noise-bg fixed inset-0 z-[60] pointer-events-none opacity-[0.05]" />
       <Navbar />
       <Hero event={data.event} tiers={data.tiers} />
-      <MapSection />
+      <UpcomingEvents event={data.event} />
       <Footer />
     </div>
   );

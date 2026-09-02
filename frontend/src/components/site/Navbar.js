@@ -2,8 +2,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 
-const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-
 const linkCls =
   "font-mono2 text-[10px] sm:text-xs uppercase tracking-[0.2em] sm:tracking-[0.25em] text-white/70 hover:text-white transition-colors";
 
@@ -16,9 +14,9 @@ export default function Navbar() {
           <Link to="/tickets" data-testid="nav-events-link" className={linkCls}>
             Events
           </Link>
-          <a href="/#gallery" onClick={(e) => { e.preventDefault(); go("gallery"); }} data-testid="nav-gallery-link" className={linkCls}>
+          <Link to="/gallery" data-testid="nav-gallery-link" className={linkCls}>
             Gallery
-          </a>
+          </Link>
         </nav>
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
@@ -46,14 +44,9 @@ export default function Navbar() {
           <Link to="/tickets" onClick={() => setOpen(false)} data-testid="nav-mobile-events-link" className={linkCls}>
             Events
           </Link>
-          <a
-            href="/#gallery"
-            onClick={(e) => { e.preventDefault(); setOpen(false); go("gallery"); }}
-            data-testid="nav-mobile-gallery-link"
-            className={linkCls}
-          >
+          <Link to="/gallery" onClick={() => setOpen(false)} data-testid="nav-mobile-gallery-link" className={linkCls}>
             Gallery
-          </a>
+          </Link>
           <Link to="/contact" onClick={() => setOpen(false)} data-testid="nav-mobile-contact-link" className={linkCls}>
             Contact
           </Link>

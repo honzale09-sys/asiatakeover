@@ -14,6 +14,7 @@ export default function Footer() {
         <div>
           <p className="font-display font-bold text-sm uppercase mb-5">Quick Links</p>
           <ul className="space-y-3 text-sm text-slate-400">
+            <li><Link to="/gallery" data-testid="footer-gallery-link" className="hover:text-white transition-colors">Gallery</Link></li>
             <li><Link to="/faq" data-testid="footer-faq-link" className="hover:text-white transition-colors">FAQ</Link></li>
             <li><Link to="/terms" data-testid="footer-terms-link" className="hover:text-white transition-colors">Terms &amp; Conditions</Link></li>
             <li><Link to="/privacy" data-testid="footer-privacy-link" className="hover:text-white transition-colors">Privacy Policy</Link></li>
