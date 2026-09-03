@@ -2,13 +2,13 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Reveal } from "@/components/site/Reveal";
 
-const sectionCls = "px-4 sm:px-8 lg:px-16 py-16 lg:py-24";
+const sectionCls = "px-4 sm:px-8 lg:px-16 py-12 lg:py-16";
 
 function SectionHead({ eyebrow, titleA, titleB, testid }) {
   return (
     <>
-      <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-4">{eyebrow}</p>
-      <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-tight mb-10" data-testid={testid}>
+      <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-3">{eyebrow}</p>
+      <h2 className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold uppercase tracking-tight mb-8" data-testid={testid}>
         {titleA} <span className="text-[#FF0055]">{titleB}</span>
       </h2>
     </>
@@ -26,7 +26,7 @@ export function WatchTheTakeover() {
     <section className={`${sectionCls} bg-[#060609]`} data-testid="watch-the-takeover-section">
       <Reveal>
         <SectionHead eyebrow="Aftermovies & recaps" titleA="Watch the" titleB="Takeover" testid="watch-the-takeover-title" />
-        <div className="grid grid-cols-3 gap-3 sm:gap-5 max-w-4xl">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4 max-w-3xl">
           {TAKEOVER_VIDEOS.map((v, i) => (
             <div key={i} className="aspect-[9/16] rounded-2xl overflow-hidden border border-white/10 bg-black" data-testid={`takeover-video-slot-${i + 1}`}>
               <video
@@ -61,25 +61,25 @@ export function ExploreStages() {
           {STAGES.map((s) => (
             <div
               key={s.id}
-              className="group rounded-2xl border border-white/10 bg-[#060609] p-7 sm:p-8 transition-colors duration-300 hover:border-[#FF0055]/50"
+              className="group rounded-2xl border border-white/10 bg-[#060609] p-5 sm:p-6 transition-colors duration-300 hover:border-[#FF0055]/50"
               data-testid={`stage-card-${s.id}`}
             >
-              <div className="flex items-start justify-between mb-10">
-                <span className="font-display text-4xl font-extrabold text-white/10 group-hover:text-[#FF0055]/40 transition-colors">{s.num}</span>
-                <span className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-white/50 border border-white/15 rounded-full px-3 py-1.5" data-testid={`stage-floor-${s.id}`}>
+              <div className="flex items-start justify-between mb-7">
+                <span className="font-display text-3xl font-extrabold text-white/10 group-hover:text-[#FF0055]/40 transition-colors">{s.num}</span>
+                <span className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-white/50 border border-white/15 rounded-full px-2.5 py-1" data-testid={`stage-floor-${s.id}`}>
                   {s.floor}
                 </span>
               </div>
               <img
                 src={s.logo}
                 alt={s.name}
-                className={`mb-6 object-contain ${s.round ? "h-12 w-12 rounded-full ring-1 ring-white/20" : "h-8"}`}
+                className={`mb-4 object-contain ${s.round ? "h-10 w-10 rounded-full ring-1 ring-white/20" : "h-6"}`}
                 data-testid={`stage-logo-${s.id}`}
               />
-              <h3 className="font-display text-xl sm:text-2xl font-extrabold uppercase tracking-tight mb-2" data-testid={`stage-name-${s.id}`}>
+              <h3 className="font-display text-base sm:text-lg font-extrabold uppercase tracking-tight mb-1.5" data-testid={`stage-name-${s.id}`}>
                 {s.name}
               </h3>
-              <p className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-500" data-testid={`stage-desc-${s.id}`}>
+              <p className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-slate-500" data-testid={`stage-desc-${s.id}`}>
                 {s.desc}
               </p>
             </div>
@@ -103,13 +103,13 @@ export function WhoPlays() {
     <section className={`${sectionCls} bg-[#060609]`} data-testid="who-plays-section">
       <Reveal>
         <SectionHead eyebrow="Lineup" titleA="Who plays" titleB="— and when?" testid="who-plays-title" />
-        <div className="flex flex-wrap gap-3 mb-10" data-testid="who-plays-tabs">
+        <div className="flex flex-nowrap gap-2 mb-8" data-testid="who-plays-tabs">
           {LINEUP_TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setActive(t.id)}
               data-testid={`who-plays-tab-${t.id}`}
-              className={`font-mono2 text-xs uppercase tracking-[0.25em] rounded-full px-7 py-3 border transition-colors duration-300 ${
+              className={`whitespace-nowrap font-mono2 text-[10px] sm:text-xs uppercase tracking-[0.12em] sm:tracking-[0.2em] rounded-full px-4 py-2 sm:px-6 sm:py-2.5 border transition-colors duration-300 ${
                 active === t.id
                   ? "bg-[#FF0055] border-[#FF0055] text-white"
                   : "border-white/20 text-white/60 hover:text-white hover:border-white/50"
@@ -123,7 +123,7 @@ export function WhoPlays() {
           <img
             src={tab.poster}
             alt={`${tab.label} stage — full lineup`}
-            className="w-full max-w-sm rounded-2xl border border-white/10"
+            className="w-full max-w-xs rounded-2xl border border-white/10"
             loading="lazy"
             data-testid={`lineup-poster-${active}`}
           />
@@ -158,14 +158,14 @@ export function BuyTicketsCta() {
   return (
     <section className={`${sectionCls} bg-[#1F050D] text-center`} data-testid="buy-tickets-cta-section">
       <Reveal>
-        <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-5">27.09.2026 • DUPLEX Prague</p>
-        <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold uppercase tracking-tight mb-10" data-testid="buy-tickets-cta-title">
+        <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-4">27.09.2026 • DUPLEX Prague</p>
+        <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-tight mb-8" data-testid="buy-tickets-cta-title">
           Ready for the <span className="text-[#FF0055]">Takeover?</span>
         </h2>
         <Link
           to="/tickets"
           data-testid="buy-tickets-cta-button"
-          className="inline-flex items-center justify-center bg-[#FF6A00] hover:bg-[#FF7A1A] text-white font-display font-bold uppercase tracking-[0.15em] text-sm sm:text-base rounded-full px-12 py-5 transition-colors duration-300 shadow-[0_0_45px_rgba(255,106,0,0.35)]"
+          className="inline-flex items-center justify-center bg-[#FF6A00] hover:bg-[#FF7A1A] text-white font-display font-bold uppercase tracking-[0.15em] text-sm rounded-full px-10 py-4 transition-colors duration-300 shadow-[0_0_45px_rgba(255,106,0,0.35)]"
         >
           Buy Tickets
         </Link>

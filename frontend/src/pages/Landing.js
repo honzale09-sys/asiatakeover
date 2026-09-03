@@ -28,16 +28,16 @@ const FALLBACK = {
 
 function UpcomingEvents({ event }) {
   return (
-    <section className="px-4 sm:px-8 lg:px-16 py-16 lg:py-24 bg-[#0B0C12] border-y border-white/5" data-testid="upcoming-events-section">
+    <section className="px-4 sm:px-8 lg:px-16 py-12 lg:py-16 bg-[#0B0C12] border-y border-white/5" data-testid="upcoming-events-section">
       <Reveal>
-        <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-4">Save the date</p>
-        <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-tight mb-10">
+        <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-3">Save the date</p>
+        <h2 className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold uppercase tracking-tight mb-8">
           Upcoming <span className="text-[#FF0055]">Events</span>
         </h2>
         <Link
           to="/tickets"
           data-testid="upcoming-event-poster-link"
-          className="group block w-full max-w-sm"
+          className="group block w-full max-w-xs"
         >
           <span className="relative block rounded-2xl overflow-hidden border border-white/10 transition-transform duration-300 group-hover:-translate-y-1">
             <img

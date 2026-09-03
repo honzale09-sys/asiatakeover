@@ -140,7 +140,7 @@ export default function Tickets({ tiers = [], event }) {
             <img
               src="/assets/poster-festival.jpg"
               alt={`${event?.name || "ASIA TAKEOVER FESTIVAL"} — 27.09.2026, DUPLEX Prague`}
-              className="w-full max-w-md mx-auto lg:mx-0 rounded-2xl border border-white/10"
+              className="w-full max-w-sm mx-auto lg:mx-0 rounded-2xl border border-white/10"
               data-testid="tickets-event-poster"
             />
             <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-slate-500 mt-5 text-center lg:text-left" data-testid="room-labels">
@@ -183,7 +183,7 @@ export default function Tickets({ tiers = [], event }) {
                     Most Popular
                   </span>
                   <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">{activeGA.name}</p>
-                  <p className="font-display font-black text-5xl sm:text-6xl mb-5" data-testid="ga-price">{czk(activeGA.price_czk)}</p>
+                  <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="ga-price">{czk(activeGA.price_czk)}</p>
                   <p className="text-slate-300 text-sm sm:text-base">Access to all 3 stages</p>
                   <p className="text-slate-500 text-sm mt-1.5">Limited availability</p>
                   <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600] mt-4" data-testid="next-release">
