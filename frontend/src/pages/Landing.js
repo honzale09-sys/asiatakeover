@@ -6,6 +6,7 @@ import Navbar from "@/components/site/Navbar";
 import Hero from "@/components/site/Hero";
 import Footer from "@/components/site/Footer";
 import { Reveal } from "@/components/site/Reveal";
+import { WatchTheTakeover, ExploreStages, WhoPlays, InsideDuplex, BuyTicketsCta } from "@/components/site/HomeSections";
 
 const FALLBACK = {
   event: {
@@ -95,6 +96,11 @@ export default function Landing() {
       <Navbar />
       <Hero event={data.event} tiers={data.tiers} />
       <UpcomingEvents event={data.event} />
+      <WatchTheTakeover />
+      <ExploreStages />
+      <WhoPlays />
+      <InsideDuplex />
+      <BuyTicketsCta />
       <Footer />
     </div>
   );
