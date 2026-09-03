@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mic2, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { Reveal } from "@/components/site/Reveal";
 
 const sectionCls = "px-4 sm:px-8 lg:px-16 py-16 lg:py-24";
@@ -16,21 +16,41 @@ function SectionHead({ eyebrow, titleA, titleB, testid }) {
   );
 }
 
+const TAKEOVER_VIDEOS = [
+  { src: "/assets/takeover-1.mp4", poster: "/assets/takeover-1.jpg" },
+  { src: "/assets/takeover-2.mp4", poster: "/assets/takeover-2.jpg" },
+  null,
+];
+
 export function WatchTheTakeover() {
   return (
     <section className={`${sectionCls} bg-[#060609]`} data-testid="watch-the-takeover-section">
       <Reveal>
         <SectionHead eyebrow="Aftermovies & recaps" titleA="Watch the" titleB="Takeover" testid="watch-the-takeover-title" />
         <div className="grid gap-5 sm:grid-cols-3">
-          {[1, 2, 3].map((n) => (
-            <div
-              key={n}
-              className="aspect-video rounded-2xl border border-dashed border-white/15 bg-white/[0.02] flex items-center justify-center"
-              data-testid={`takeover-video-slot-${n}`}
-            >
-              <span className="font-display text-6xl sm:text-7xl font-extrabold text-white/10 select-none">X</span>
-            </div>
-          ))}
+          {TAKEOVER_VIDEOS.map((v, i) =>
+            v ? (
+              <div key={i} className="aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black" data-testid={`takeover-video-slot-${i + 1}`}>
+                <video
+                  src={v.src}
+                  poster={v.poster}
+                  controls
+                  playsInline
+                  preload="none"
+                  className="w-full h-full object-contain"
+                  data-testid={`takeover-video-${i + 1}`}
+                />
+              </div>
+            ) : (
+              <div
+                key={i}
+                className="aspect-video rounded-2xl border border-dashed border-white/15 bg-white/[0.02] flex items-center justify-center"
+                data-testid={`takeover-video-slot-${i + 1}`}
+              >
+                <span className="font-display text-6xl sm:text-7xl font-extrabold text-white/10 select-none">X</span>
+              </div>
+            )
+          )}
         </div>
       </Reveal>
     </section>
@@ -82,13 +102,43 @@ export function ExploreStages() {
 }
 
 const LINEUP_TABS = [
-  { id: "seoul", label: "Seoul" },
-  { id: "mainstream", label: "Mainstream" },
-  { id: "gangshii", label: "Gangshii" },
+  {
+    id: "seoul",
+    label: "Seoul",
+    poster: "/assets/lineup-seoul.jpg",
+    djs: [
+      { name: "MIKI", country: "DE", times: ["22:00–23:00", "K-POP Rave Hour 01:30–03:00"] },
+      { name: "HAMYWHO", country: "CZ", times: ["23:00–00:00"] },
+      { name: "SHEN", country: "AT", times: ["00:00–01:30", "03:00–04:00"] },
+    ],
+  },
+  {
+    id: "mainstream",
+    label: "Mainstream",
+    poster: "/assets/lineup-mainstream.jpg",
+    djs: [
+      { name: "MELI", country: "CZ", times: ["22:00–00:30"] },
+      { name: "CAO", country: "CZ", times: ["00:30–02:30"] },
+      { name: "SHEEKO", country: "CZ", times: ["02:30–05:00"] },
+    ],
+  },
+  {
+    id: "gangshii",
+    label: "Gangshii",
+    poster: "/assets/lineup-saigon.jpg",
+    djs: [
+      { name: "MEIMEI", country: "CZ", times: ["22:00–23:00"] },
+      { name: "FUNK SPICE", country: "DE", times: ["23:00–01:00", "04:00–05:00"] },
+      { name: "BROOK", country: "CZ", times: ["Editz Hour 01:00–02:00"] },
+      { name: "ANKY", country: "CZ", times: ["02:00–03:00"] },
+      { name: "GTCA", country: "VN", times: ["Vinahouse Hour 03:00–04:00"] },
+    ],
+  },
 ];
 
 export function WhoPlays() {
   const [active, setActive] = useState("seoul");
+  const tab = LINEUP_TABS.find((t) => t.id === active);
   return (
     <section className={`${sectionCls} bg-[#060609]`} data-testid="who-plays-section">
       <Reveal>
@@ -109,17 +159,43 @@ export function WhoPlays() {
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-5" data-testid={`dj-grid-${active}`}>
-          {[1, 2, 3, 4].map((n) => (
-            <div
-              key={`${active}-${n}`}
-              className="aspect-square rounded-2xl border border-dashed border-white/15 bg-white/[0.02] flex flex-col items-center justify-center gap-3"
-              data-testid={`dj-placeholder-${active}-${n}`}
-            >
-              <Mic2 size={26} className="text-white/20" />
-              <span className="font-mono2 text-[10px] uppercase tracking-[0.25em] text-white/30">DJ TBA</span>
-            </div>
-          ))}
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,360px)_1fr] items-start" data-testid={`dj-grid-${active}`}>
+          <img
+            src={tab.poster}
+            alt={`${tab.label} stage — full lineup`}
+            className="w-full max-w-sm rounded-2xl border border-white/10"
+            loading="lazy"
+            data-testid={`lineup-poster-${active}`}
+          />
+          <div data-testid={`dj-schedule-${active}`}>
+            {tab.djs.map((dj, i) => (
+              <div
+                key={dj.name}
+                className="flex items-center justify-between gap-4 py-4 border-b border-white/5"
+                data-testid={`dj-row-${active}-${i + 1}`}
+              >
+                <div className="flex items-center gap-4 min-w-0">
+                  <span className="font-display text-lg sm:text-2xl font-extrabold uppercase tracking-tight truncate" data-testid={`dj-name-${active}-${i + 1}`}>
+                    {dj.name}
+                  </span>
+                  <span className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-white/40 border border-white/15 rounded px-1.5 py-0.5" data-testid={`dj-country-${active}-${i + 1}`}>
+                    {dj.country}
+                  </span>
+                </div>
+                <div className="text-right shrink-0">
+                  {dj.times.map((t) => (
+                    <p
+                      key={t}
+                      className={`font-mono2 text-[11px] sm:text-xs tracking-[0.15em] ${/hour/i.test(t) ? "text-[#FF0055] uppercase" : "text-white/70"}`}
+                      data-testid={`dj-time-${active}-${i + 1}`}
+                    >
+                      {t}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </Reveal>
     </section>
