@@ -26,9 +26,9 @@ export function WatchTheTakeover() {
     <section className={`${sectionCls} bg-[#060609]`} data-testid="watch-the-takeover-section">
       <Reveal>
         <SectionHead eyebrow="Aftermovies & recaps" titleA="Watch the" titleB="Takeover" testid="watch-the-takeover-title" />
-        <div className="grid gap-5 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-3 sm:gap-5 max-w-4xl">
           {TAKEOVER_VIDEOS.map((v, i) => (
-            <div key={i} className="aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black" data-testid={`takeover-video-slot-${i + 1}`}>
+            <div key={i} className="aspect-[9/16] rounded-2xl overflow-hidden border border-white/10 bg-black" data-testid={`takeover-video-slot-${i + 1}`}>
               <video
                 src={v.src}
                 poster={v.poster}
@@ -91,38 +91,9 @@ export function ExploreStages() {
 }
 
 const LINEUP_TABS = [
-  {
-    id: "seoul",
-    label: "Seoul",
-    poster: "/assets/lineup-seoul.jpg",
-    djs: [
-      { name: "MIKI", country: "DE", times: ["22:00–23:00", "K-POP Rave Hour 01:30–03:00"] },
-      { name: "HAMYWHO", country: "CZ", times: ["23:00–00:00"] },
-      { name: "SHEN", country: "AT", times: ["00:00–01:30", "03:00–04:00"] },
-    ],
-  },
-  {
-    id: "mainstream",
-    label: "Mainstream",
-    poster: "/assets/lineup-mainstream.jpg",
-    djs: [
-      { name: "MELI", country: "CZ", times: ["22:00–00:30"] },
-      { name: "CAO", country: "CZ", times: ["00:30–02:30"] },
-      { name: "SHEEKO", country: "CZ", times: ["02:30–05:00"] },
-    ],
-  },
-  {
-    id: "gangshii",
-    label: "Gangshii",
-    poster: "/assets/lineup-saigon.jpg",
-    djs: [
-      { name: "MEIMEI", country: "CZ", times: ["22:00–23:00"] },
-      { name: "FUNK SPICE", country: "DE", times: ["23:00–01:00", "04:00–05:00"] },
-      { name: "BROOK", country: "CZ", times: ["Editz Hour 01:00–02:00"] },
-      { name: "ANKY", country: "CZ", times: ["02:00–03:00"] },
-      { name: "GTCA", country: "VN", times: ["Vinahouse Hour 03:00–04:00"] },
-    ],
-  },
+  { id: "seoul", label: "Seoul", poster: "/assets/lineup-seoul.jpg" },
+  { id: "mainstream", label: "Mainstream", poster: "/assets/lineup-mainstream.jpg" },
+  { id: "gangshii", label: "Gangshii", poster: "/assets/lineup-saigon.jpg" },
 ];
 
 export function WhoPlays() {
@@ -148,7 +119,7 @@ export function WhoPlays() {
             </button>
           ))}
         </div>
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,360px)_1fr] items-start" data-testid={`dj-grid-${active}`}>
+        <div className="flex justify-center" data-testid={`dj-grid-${active}`}>
           <img
             src={tab.poster}
             alt={`${tab.label} stage — full lineup`}
@@ -156,35 +127,6 @@ export function WhoPlays() {
             loading="lazy"
             data-testid={`lineup-poster-${active}`}
           />
-          <div data-testid={`dj-schedule-${active}`}>
-            {tab.djs.map((dj, i) => (
-              <div
-                key={dj.name}
-                className="flex items-center justify-between gap-4 py-4 border-b border-white/5"
-                data-testid={`dj-row-${active}-${i + 1}`}
-              >
-                <div className="flex items-center gap-4 min-w-0">
-                  <span className="font-display text-lg sm:text-2xl font-extrabold uppercase tracking-tight truncate" data-testid={`dj-name-${active}-${i + 1}`}>
-                    {dj.name}
-                  </span>
-                  <span className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-white/40 border border-white/15 rounded px-1.5 py-0.5" data-testid={`dj-country-${active}-${i + 1}`}>
-                    {dj.country}
-                  </span>
-                </div>
-                <div className="text-right shrink-0">
-                  {dj.times.map((t) => (
-                    <p
-                      key={t}
-                      className={`font-mono2 text-[11px] sm:text-xs tracking-[0.15em] ${/hour/i.test(t) ? "text-[#FF0055] uppercase" : "text-white/70"}`}
-                      data-testid={`dj-time-${active}-${i + 1}`}
-                    >
-                      {t}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </Reveal>
     </section>
