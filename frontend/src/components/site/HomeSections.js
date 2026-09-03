@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Play } from "lucide-react";
 import { Reveal } from "@/components/site/Reveal";
 
 const sectionCls = "px-4 sm:px-8 lg:px-16 py-16 lg:py-24";
@@ -19,7 +18,7 @@ function SectionHead({ eyebrow, titleA, titleB, testid }) {
 const TAKEOVER_VIDEOS = [
   { src: "/assets/takeover-1.mp4", poster: "/assets/takeover-1.jpg" },
   { src: "/assets/takeover-2.mp4", poster: "/assets/takeover-2.jpg" },
-  null,
+  { src: "/assets/takeover-3.mp4", poster: "/assets/takeover-3.jpg" },
 ];
 
 export function WatchTheTakeover() {
@@ -28,29 +27,19 @@ export function WatchTheTakeover() {
       <Reveal>
         <SectionHead eyebrow="Aftermovies & recaps" titleA="Watch the" titleB="Takeover" testid="watch-the-takeover-title" />
         <div className="grid gap-5 sm:grid-cols-3">
-          {TAKEOVER_VIDEOS.map((v, i) =>
-            v ? (
-              <div key={i} className="aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black" data-testid={`takeover-video-slot-${i + 1}`}>
-                <video
-                  src={v.src}
-                  poster={v.poster}
-                  controls
-                  playsInline
-                  preload="none"
-                  className="w-full h-full object-contain"
-                  data-testid={`takeover-video-${i + 1}`}
-                />
-              </div>
-            ) : (
-              <div
-                key={i}
-                className="aspect-video rounded-2xl border border-dashed border-white/15 bg-white/[0.02] flex items-center justify-center"
-                data-testid={`takeover-video-slot-${i + 1}`}
-              >
-                <span className="font-display text-6xl sm:text-7xl font-extrabold text-white/10 select-none">X</span>
-              </div>
-            )
-          )}
+          {TAKEOVER_VIDEOS.map((v, i) => (
+            <div key={i} className="aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black" data-testid={`takeover-video-slot-${i + 1}`}>
+              <video
+                src={v.src}
+                poster={v.poster}
+                controls
+                playsInline
+                preload="none"
+                className="w-full h-full object-contain"
+                data-testid={`takeover-video-${i + 1}`}
+              />
+            </div>
+          ))}
         </div>
       </Reveal>
     </section>
@@ -207,14 +196,16 @@ export function InsideDuplex() {
     <section className={`${sectionCls} bg-[#0B0C12] border-y border-white/5`} data-testid="inside-duplex-section">
       <Reveal>
         <SectionHead eyebrow="From the sky" titleA="Inside" titleB="Duplex" testid="inside-duplex-title" />
-        <div
-          className="aspect-video w-full rounded-2xl border border-dashed border-white/15 bg-white/[0.02] flex flex-col items-center justify-center gap-4"
-          data-testid="inside-duplex-video-slot"
-        >
-          <span className="w-16 h-16 rounded-full border border-white/20 flex items-center justify-center">
-            <Play size={22} className="text-white/40 ml-1" />
-          </span>
-          <span className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-white/30">Drone footage coming soon</span>
+        <div className="aspect-video w-full rounded-2xl overflow-hidden border border-white/10 bg-black" data-testid="inside-duplex-video-slot">
+          <video
+            src="/assets/duplex-showcase.mp4"
+            poster="/assets/duplex-showcase.jpg"
+            controls
+            playsInline
+            preload="none"
+            className="w-full h-full object-contain"
+            data-testid="inside-duplex-video"
+          />
         </div>
       </Reveal>
     </section>
