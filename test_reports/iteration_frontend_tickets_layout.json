@@ -1,0 +1,29 @@
+{
+  "summary": "Verified /tickets page layout redesign: poster left / purchase panel right on desktop, stacked on mobile, checkout modal + SIM redirect regression all pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "desktop_layout": "PASS — poster bbox x=64..512, GA card bbox x=1029..1815 (poster clearly left of purchase panel).",
+    "right_panel_content": "PASS — 'Get Your Ticket' heading, EARLY BIRD card with ga-price=449 Kč, 'Most Popular' badge, next-release='Next release: 499 Kč', price-progression strip present, orange Buy Ticket button.",
+    "vip_card": "PASS — VIP card (vip-price=799 Kč) renders below GA in same right column (x=1021, y=825 vs GA y=365).",
+    "checkout_modal": "PASS — clicking Buy Ticket opens checkout-modal with name/email/quantity fields and 'Continue to Payment — 449 Kč' button. Close button dismisses modal.",
+    "mobile_390x844": "PASS — poster (y=112) stacks above GA card (y=838), scrollWidth=390 (no horizontal overflow), buy button visible.",
+    "regression_sim_redirect": "PASS — submitting checkout form redirected to /pay/2d65154bf08a4149aba6e2e36aa0b970 (SIM). Payment not completed as instructed."
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Non-blocking: Console shows a React 'span cannot be a child of option' hydration warning inside CheckoutModal's quantity <select>. Source code in Tickets.js line 87 is clean ({i+1} ticket{i>0?'s':''}); the warning comes from Emergent's dev-tool DOM instrumentation injecting <span> wrappers into <option>. Only appears in preview/dev; no user-visible impact. Safe to ignore unless it reproduces in a production build."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "LOCKDOWN_PASSWORD read from backend/.env; bypassed via localStorage atf_unlocked='1'.",
+  "seed_data_creation": "One TEST order created via SIM checkout (name='TEST User', email='test@example.com'); payment not completed so order stays in pending state.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Tickets page uses lg:grid-cols-2 with sticky poster left and purchase column right. All data-testids preserved: tickets-event-poster, ga-price, vip-price, next-release, most-popular-badge, price-progression, buy-ticket-button-*, checkout-modal, checkout-name-input, checkout-email-input, checkout-quantity-select, checkout-pay-button, checkout-close-button. GoPay is in SIM mode → /pay/:orderId."
+}

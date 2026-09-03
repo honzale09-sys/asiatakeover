@@ -133,122 +133,135 @@ export default function Tickets({ tiers = [], event }) {
   const vipOut = vip ? !isAvailable(vip) : false;
 
   return (
-    <section id="tickets" className="px-4 sm:px-8 lg:px-16 py-20 lg:py-28" data-testid="tickets-section">
-      <Reveal>
-        <div className="mb-12 lg:mb-16">
-          <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-4">Tickets</p>
-          <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-tight leading-tight">
-            Choose Your <span className="text-[#FF0055]">Ticket</span>
-          </h2>
-          <p className="text-slate-400 text-sm sm:text-base mt-4">One ticket gives you access to all three rooms.</p>
-          <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-slate-500 mt-3" data-testid="room-labels">
-            Seoul Room <span className="text-[#FF0055]">•</span> Mainstream Room <span className="text-[#FF0055]">•</span> Gangshii Room
-          </p>
-        </div>
-      </Reveal>
-
-      <div className="grid lg:grid-cols-5 gap-6 lg:gap-8 items-start" data-testid="ticket-tiers">
-        <Reveal className="lg:col-span-3">
-          <div>
-            {soldOutGA.map((t) => (
-              <div
-                key={t.id}
-                data-testid={`soldout-row-${t.id}`}
-                className="flex items-center justify-between border border-white/5 bg-white/[0.02] rounded-lg px-4 py-2.5 mb-2 opacity-45"
-              >
-                <span className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500">{t.name}</span>
-                <span className="font-mono2 text-xs text-slate-500">{czk(t.price_czk)}</span>
-                <span className="font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 border border-white/10 rounded-full px-3 py-1">Sold out</span>
-              </div>
-            ))}
-
-            {activeGA ? (
-              <div
-                data-testid={`ticket-tier-card-${activeGA.id}`}
-                className="relative border border-[#FF0055]/50 bg-[#0D0E15] rounded-3xl p-7 sm:p-10 shadow-[0_0_50px_rgba(255,0,85,0.18)] hover:shadow-[0_0_70px_rgba(255,0,85,0.28)] hover:border-[#FF0055]/80 transition-all duration-300"
-              >
-                <span className="absolute -top-3 left-7 bg-[#FF0055] font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full" data-testid="most-popular-badge">
-                  Most Popular
-                </span>
-                <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">{activeGA.name}</p>
-                <p className="font-display font-black text-5xl sm:text-6xl mb-5" data-testid="ga-price">{czk(activeGA.price_czk)}</p>
-                <p className="text-slate-300 text-sm sm:text-base">Access to all 3 rooms</p>
-                <p className="text-slate-500 text-sm mt-1.5">Limited availability</p>
-                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600] mt-4" data-testid="next-release">
-                  {nextGA ? `Next release: ${czk(nextGA.price_czk)}` : "Final online ticket release"}
-                </p>
-                <button
-                  data-testid={`buy-ticket-button-${activeGA.id}`}
-                  onClick={() => setSelected(activeGA)}
-                  className="mt-7 w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-base py-4 rounded-full transition-colors duration-300 shadow-[0_0_45px_rgba(255,106,0,0.35)] min-h-[56px]"
-                >
-                  Buy Ticket
-                </button>
-                <div className="mt-7 pt-5 border-t border-white/5" data-testid="price-progression">
-                  <p className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-slate-600 mb-2">
-                    Ticket prices increase as each release sells out
-                  </p>
-                  <p className="font-mono2 text-[11px] text-slate-500 tracking-[0.1em]">
-                    {ga.map((t, i) => (
-                      <span key={t.id}>
-                        {i > 0 && <span className="text-slate-700 mx-1.5">→</span>}
-                        <span className={!isAvailable(t) ? "line-through text-slate-700" : t.id === activeGA.id ? "text-white" : ""}>
-                          {czk(t.price_czk)}
-                        </span>
-                      </span>
-                    ))}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="border border-white/10 bg-[#0D0E15] rounded-3xl p-10 text-center" data-testid="ga-soldout-card">
-                <p className="font-display font-extrabold text-xl uppercase text-slate-400">All releases sold out</p>
-                <p className="text-slate-500 text-sm mt-2">Follow us for last-minute announcements.</p>
-              </div>
-            )}
+    <section id="tickets" className="px-4 sm:px-8 lg:px-16 py-12 lg:py-20" data-testid="tickets-section">
+      <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-start" data-testid="ticket-tiers">
+        <Reveal>
+          <div className="lg:sticky lg:top-8">
+            <img
+              src="/assets/poster-festival.jpg"
+              alt={`${event?.name || "ASIA TAKEOVER FESTIVAL"} — 27.09.2026, DUPLEX Prague`}
+              className="w-full max-w-md mx-auto lg:mx-0 rounded-2xl border border-white/10"
+              data-testid="tickets-event-poster"
+            />
+            <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-slate-500 mt-5 text-center lg:text-left" data-testid="room-labels">
+              Seoul Floor <span className="text-[#FF0055]">•</span> Mainstream Floor <span className="text-[#FF0055]">•</span> Saigon Floor
+            </p>
           </div>
         </Reveal>
 
-        {vip && (
-          <Reveal delay={0.1} className="lg:col-span-2">
-            <div
-              data-testid={`ticket-tier-card-${vip.id}`}
-              className={`relative border rounded-3xl p-7 sm:p-8 transition-all duration-300 ${
-                vipOut
-                  ? "border-white/5 bg-white/[0.02] opacity-50"
-                  : "border-[#C9A227]/40 bg-[#0D0E15] hover:border-[#C9A227]/70 hover:shadow-[0_0_40px_rgba(201,162,39,0.15)]"
-              }`}
-            >
-              {vipOut && (
-                <span className="absolute -top-3 left-7 bg-white/10 font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full text-slate-400" data-testid="vip-soldout-badge">
-                  Sold out
-                </span>
-              )}
-              <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227] mb-3">{vip.name}</p>
-              <p className="font-display font-black text-4xl sm:text-5xl mb-5" data-testid="vip-price">{czk(vip.price_czk)}</p>
-              <ul className="space-y-2.5 mb-4">
-                {(vip.perks || []).map((p) => (
-                  <li key={p} className="flex items-start gap-2 text-sm text-slate-300">
-                    <Check size={15} className="text-[#C9A227] mt-0.5 shrink-0" /> {p}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-slate-500 text-sm mb-6">Limited VIP capacity</p>
-              <button
-                data-testid={`buy-ticket-button-${vip.id}`}
-                disabled={vipOut}
-                onClick={() => setSelected(vip)}
-                className={`w-full font-display font-bold uppercase text-sm py-4 rounded-full transition-colors duration-300 min-h-[56px] ${
-                  vipOut
-                    ? "bg-white/5 text-slate-600 cursor-not-allowed"
-                    : "border border-[#C9A227] text-[#C9A227] hover:bg-[#C9A227] hover:text-black"
-                }`}
-              >
-                {vipOut ? "Sold Out" : "Buy VIP"}
-              </button>
+        <div>
+          <Reveal>
+            <div className="mb-8 lg:mb-10">
+              <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-4">Tickets</p>
+              <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-tight leading-tight">
+                Get Your <span className="text-[#FF0055]">Ticket</span>
+              </h2>
+              <p className="text-slate-400 text-sm sm:text-base mt-4">One ticket gives you access to all three stages.</p>
             </div>
           </Reveal>
-        )}
+
+          <Reveal>
+            <div>
+              {soldOutGA.map((t) => (
+                <div
+                  key={t.id}
+                  data-testid={`soldout-row-${t.id}`}
+                  className="flex items-center justify-between border border-white/5 bg-white/[0.02] rounded-lg px-4 py-2.5 mb-2 opacity-45"
+                >
+                  <span className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500">{t.name}</span>
+                  <span className="font-mono2 text-xs text-slate-500">{czk(t.price_czk)}</span>
+                  <span className="font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 border border-white/10 rounded-full px-3 py-1">Sold out</span>
+                </div>
+              ))}
+
+              {activeGA ? (
+                <div
+                  data-testid={`ticket-tier-card-${activeGA.id}`}
+                  className="relative border border-[#FF0055]/50 bg-[#0D0E15] rounded-3xl p-7 sm:p-10 shadow-[0_0_50px_rgba(255,0,85,0.18)] hover:shadow-[0_0_70px_rgba(255,0,85,0.28)] hover:border-[#FF0055]/80 transition-all duration-300"
+                >
+                  <span className="absolute -top-3 left-7 bg-[#FF0055] font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full" data-testid="most-popular-badge">
+                    Most Popular
+                  </span>
+                  <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">{activeGA.name}</p>
+                  <p className="font-display font-black text-5xl sm:text-6xl mb-5" data-testid="ga-price">{czk(activeGA.price_czk)}</p>
+                  <p className="text-slate-300 text-sm sm:text-base">Access to all 3 stages</p>
+                  <p className="text-slate-500 text-sm mt-1.5">Limited availability</p>
+                  <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600] mt-4" data-testid="next-release">
+                    {nextGA ? `Next release: ${czk(nextGA.price_czk)}` : "Final online ticket release"}
+                  </p>
+                  <button
+                    data-testid={`buy-ticket-button-${activeGA.id}`}
+                    onClick={() => setSelected(activeGA)}
+                    className="mt-7 w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-base py-4 rounded-full transition-colors duration-300 shadow-[0_0_45px_rgba(255,106,0,0.35)] min-h-[56px]"
+                  >
+                    Buy Ticket
+                  </button>
+                  <div className="mt-7 pt-5 border-t border-white/5" data-testid="price-progression">
+                    <p className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-slate-600 mb-2">
+                      Ticket prices increase as each release sells out
+                    </p>
+                    <p className="font-mono2 text-[11px] text-slate-500 tracking-[0.1em]">
+                      {ga.map((t, i) => (
+                        <span key={t.id}>
+                          {i > 0 && <span className="text-slate-700 mx-1.5">→</span>}
+                          <span className={!isAvailable(t) ? "line-through text-slate-700" : t.id === activeGA.id ? "text-white" : ""}>
+                            {czk(t.price_czk)}
+                          </span>
+                        </span>
+                      ))}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="border border-white/10 bg-[#0D0E15] rounded-3xl p-10 text-center" data-testid="ga-soldout-card">
+                  <p className="font-display font-extrabold text-xl uppercase text-slate-400">All releases sold out</p>
+                  <p className="text-slate-500 text-sm mt-2">Follow us for last-minute announcements.</p>
+                </div>
+              )}
+            </div>
+          </Reveal>
+
+          {vip && (
+            <Reveal delay={0.1}>
+              <div
+                data-testid={`ticket-tier-card-${vip.id}`}
+                className={`mt-6 relative border rounded-3xl p-7 sm:p-8 transition-all duration-300 ${
+                  vipOut
+                    ? "border-white/5 bg-white/[0.02] opacity-50"
+                    : "border-[#C9A227]/40 bg-[#0D0E15] hover:border-[#C9A227]/70 hover:shadow-[0_0_40px_rgba(201,162,39,0.15)]"
+                }`}
+              >
+                {vipOut && (
+                  <span className="absolute -top-3 left-7 bg-white/10 font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full text-slate-400" data-testid="vip-soldout-badge">
+                    Sold out
+                  </span>
+                )}
+                <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227] mb-3">{vip.name}</p>
+                <p className="font-display font-black text-4xl sm:text-5xl mb-5" data-testid="vip-price">{czk(vip.price_czk)}</p>
+                <ul className="space-y-2.5 mb-4">
+                  {(vip.perks || []).map((p) => (
+                    <li key={p} className="flex items-start gap-2 text-sm text-slate-300">
+                      <Check size={15} className="text-[#C9A227] mt-0.5 shrink-0" /> {p}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-slate-500 text-sm mb-6">Limited VIP capacity</p>
+                <button
+                  data-testid={`buy-ticket-button-${vip.id}`}
+                  disabled={vipOut}
+                  onClick={() => setSelected(vip)}
+                  className={`w-full font-display font-bold uppercase text-sm py-4 rounded-full transition-colors duration-300 min-h-[56px] ${
+                    vipOut
+                      ? "bg-white/5 text-slate-600 cursor-not-allowed"
+                      : "border border-[#C9A227] text-[#C9A227] hover:bg-[#C9A227] hover:text-black"
+                  }`}
+                >
+                  {vipOut ? "Sold Out" : "Buy VIP"}
+                </button>
+              </div>
+            </Reveal>
+          )}
+        </div>
       </div>
 
       <AnimatePresence>
