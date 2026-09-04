@@ -40,6 +40,7 @@
   }
   html {
     scroll-behavior: smooth;
+    overflow-x: clip;
   }
   body {
     @apply bg-background text-foreground;
@@ -47,6 +48,7 @@
     background-color: #060609;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: clip;
   }
   ::selection {
     background: #ff0055;
