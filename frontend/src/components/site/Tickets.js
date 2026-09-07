@@ -106,7 +106,7 @@ function CheckoutModal({ tier, event, onClose }) {
               <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#00F0FF] hover:underline">
                 Terms & Conditions
               </a>
-              .
+              . Tickets are non-refundable and freely transferable.
             </p>
           </form>
         )}
@@ -134,118 +134,99 @@ export default function Tickets({ tiers = [], event }) {
 
   return (
     <section id="tickets" className="px-4 sm:px-8 lg:px-16 py-12 lg:py-20" data-testid="tickets-section">
-      <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-start" data-testid="ticket-tiers">
-        <Reveal>
-          <div className="lg:sticky lg:top-8">
-            <img
-              src="/assets/poster-festival.jpg"
-              alt={`${event?.name || "ASIA TAKEOVER FESTIVAL"} — 27.09.2026, DUPLEX Prague`}
-              className="w-full max-w-sm mx-auto lg:mx-0 rounded-2xl border border-white/10"
-              data-testid="tickets-event-poster"
-            />
-            <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-slate-500 mt-5 text-center lg:text-left" data-testid="room-labels">
-              Seoul Floor <span className="text-[#FF0055]">•</span> Mainstream Floor <span className="text-[#FF0055]">•</span> Saigon Floor
-            </p>
-          </div>
+      <div className="grid gap-10 lg:grid-cols-[1fr_minmax(0,400px)_1fr] lg:gap-12 items-start" data-testid="ticket-tiers">
+        <Reveal className="lg:order-2">
+          <img
+            src="/assets/poster-festival.jpg"
+            alt={`${event?.name || "ASIA TAKEOVER FESTIVAL"} — 27.09.2026, DUPLEX Prague`}
+            className="w-full max-w-sm mx-auto rounded-2xl border border-white/10 lg:sticky lg:top-8"
+            data-testid="tickets-event-poster"
+          />
         </Reveal>
 
-        <div>
-          <Reveal>
-            <div className="mb-8 lg:mb-10">
-              <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-4">Tickets</p>
-              <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-tight leading-tight">
-                Get Your <span className="text-[#FF0055]">Ticket</span>
-              </h2>
-              <p className="text-slate-400 text-sm sm:text-base mt-4">One ticket gives you access to all three stages.</p>
-            </div>
-          </Reveal>
+        <Reveal delay={0.05} className="lg:order-3">
+          <div className="max-w-md mx-auto lg:mx-0">
+            <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-2">Tickets</p>
+            <h2 className="font-display text-xl sm:text-2xl font-extrabold uppercase tracking-tight mb-1">
+              {event?.name || "Asia Takeover Festival"}
+            </h2>
+            <p className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-500 mb-8" data-testid="room-labels">
+              {event?.date_label || "27.09.2026"} <span className="text-[#FF0055]">•</span> {event?.venue || "DUPLEX"} {event?.city || "Prague"}
+            </p>
 
-          <Reveal>
-            <div>
-              {soldOutGA.map((t) => (
-                <div
-                  key={t.id}
-                  data-testid={`soldout-row-${t.id}`}
-                  className="flex items-center justify-between border border-white/5 bg-white/[0.02] rounded-lg px-4 py-2.5 mb-2 opacity-45"
-                >
-                  <span className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500">{t.name}</span>
-                  <span className="font-mono2 text-xs text-slate-500">{czk(t.price_czk)}</span>
-                  <span className="font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 border border-white/10 rounded-full px-3 py-1">Sold out</span>
-                </div>
-              ))}
+            {soldOutGA.map((t) => (
+              <div
+                key={t.id}
+                data-testid={`soldout-row-${t.id}`}
+                className="flex items-center justify-between border border-white/5 bg-white/[0.02] rounded-lg px-4 py-2.5 mb-2 opacity-45"
+              >
+                <span className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500">{t.name}</span>
+                <span className="font-mono2 text-xs text-slate-500">{czk(t.price_czk)}</span>
+                <span className="font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 border border-white/10 rounded-full px-3 py-1">Sold out</span>
+              </div>
+            ))}
 
-              {activeGA ? (
-                <div
-                  data-testid={`ticket-tier-card-${activeGA.id}`}
-                  className="relative border border-[#FF0055]/50 bg-[#0D0E15] rounded-3xl p-7 sm:p-10 shadow-[0_0_50px_rgba(255,0,85,0.18)] hover:shadow-[0_0_70px_rgba(255,0,85,0.28)] hover:border-[#FF0055]/80 transition-all duration-300"
+            {activeGA ? (
+              <div
+                data-testid={`ticket-tier-card-${activeGA.id}`}
+                className="relative border border-[#FF0055]/50 bg-[#0D0E15] rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(255,0,85,0.18)] hover:shadow-[0_0_70px_rgba(255,0,85,0.28)] hover:border-[#FF0055]/80 transition-all duration-300"
+              >
+                <span className="absolute -top-3 left-6 bg-[#FF0055] font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full" data-testid="most-popular-badge">
+                  Selling now
+                </span>
+                <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">{activeGA.name}</p>
+                <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="ga-price">{czk(activeGA.price_czk)}</p>
+                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600] mb-6" data-testid="next-release">
+                  {nextGA ? `Next release: ${czk(nextGA.price_czk)}` : "Final online ticket release"}
+                </p>
+                <button
+                  data-testid={`buy-ticket-button-${activeGA.id}`}
+                  onClick={() => setSelected(activeGA)}
+                  className="w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-base py-4 rounded-full transition-colors duration-300 shadow-[0_0_45px_rgba(255,106,0,0.35)] min-h-[56px]"
                 >
-                  <span className="absolute -top-3 left-7 bg-[#FF0055] font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full" data-testid="most-popular-badge">
-                    Most Popular
-                  </span>
-                  <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">{activeGA.name}</p>
-                  <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="ga-price">{czk(activeGA.price_czk)}</p>
-                  <p className="text-slate-300 text-sm sm:text-base">Access to all 3 stages</p>
-                  <p className="text-slate-500 text-sm mt-1.5">Limited availability</p>
-                  <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600] mt-4" data-testid="next-release">
-                    {nextGA ? `Next release: ${czk(nextGA.price_czk)}` : "Final online ticket release"}
+                  Buy Ticket
+                </button>
+                <div className="mt-6 pt-5 border-t border-white/5" data-testid="price-progression">
+                  <p className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-slate-600 mb-2">
+                    Price increases as each release sells out
                   </p>
-                  <button
-                    data-testid={`buy-ticket-button-${activeGA.id}`}
-                    onClick={() => setSelected(activeGA)}
-                    className="mt-7 w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-base py-4 rounded-full transition-colors duration-300 shadow-[0_0_45px_rgba(255,106,0,0.35)] min-h-[56px]"
-                  >
-                    Buy Ticket
-                  </button>
-                  <div className="mt-7 pt-5 border-t border-white/5" data-testid="price-progression">
-                    <p className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-slate-600 mb-2">
-                      Ticket prices increase as each release sells out
-                    </p>
-                    <p className="font-mono2 text-[11px] text-slate-500 tracking-[0.1em]">
-                      {ga.map((t, i) => (
-                        <span key={t.id}>
-                          {i > 0 && <span className="text-slate-700 mx-1.5">→</span>}
-                          <span className={!isAvailable(t) ? "line-through text-slate-700" : t.id === activeGA.id ? "text-white" : ""}>
-                            {czk(t.price_czk)}
-                          </span>
+                  <p className="font-mono2 text-[11px] text-slate-500 tracking-[0.1em]">
+                    {ga.map((t, i) => (
+                      <span key={t.id}>
+                        {i > 0 && <span className="text-slate-700 mx-1.5">→</span>}
+                        <span className={!isAvailable(t) ? "line-through text-slate-700" : t.id === activeGA.id ? "text-white" : ""}>
+                          {czk(t.price_czk)}
                         </span>
-                      ))}
-                    </p>
-                  </div>
+                      </span>
+                    ))}
+                  </p>
                 </div>
-              ) : (
-                <div className="border border-white/10 bg-[#0D0E15] rounded-3xl p-10 text-center" data-testid="ga-soldout-card">
-                  <p className="font-display font-extrabold text-xl uppercase text-slate-400">All releases sold out</p>
-                  <p className="text-slate-500 text-sm mt-2">Follow us for last-minute announcements.</p>
-                </div>
-              )}
-            </div>
-          </Reveal>
+              </div>
+            ) : (
+              <div className="border border-white/10 bg-[#0D0E15] rounded-3xl p-10 text-center" data-testid="ga-soldout-card">
+                <p className="font-display font-extrabold text-xl uppercase text-slate-400">All releases sold out</p>
+                <p className="text-slate-500 text-sm mt-2">Follow us for last-minute announcements.</p>
+              </div>
+            )}
 
-          {vip && (
-            <Reveal delay={0.1}>
+            {vip && (
               <div
                 data-testid={`ticket-tier-card-${vip.id}`}
-                className={`mt-6 relative border rounded-3xl p-7 sm:p-8 transition-all duration-300 ${
+                className={`mt-5 relative border rounded-3xl p-6 sm:p-7 transition-all duration-300 ${
                   vipOut
                     ? "border-white/5 bg-white/[0.02] opacity-50"
                     : "border-[#C9A227]/40 bg-[#0D0E15] hover:border-[#C9A227]/70 hover:shadow-[0_0_40px_rgba(201,162,39,0.15)]"
                 }`}
               >
                 {vipOut && (
-                  <span className="absolute -top-3 left-7 bg-white/10 font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full text-slate-400" data-testid="vip-soldout-badge">
+                  <span className="absolute -top-3 left-6 bg-white/10 font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full text-slate-400" data-testid="vip-soldout-badge">
                     Sold out
                   </span>
                 )}
-                <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227] mb-3">{vip.name}</p>
-                <p className="font-display font-black text-4xl sm:text-5xl mb-5" data-testid="vip-price">{czk(vip.price_czk)}</p>
-                <ul className="space-y-2.5 mb-4">
-                  {(vip.perks || []).map((p) => (
-                    <li key={p} className="flex items-start gap-2 text-sm text-slate-300">
-                      <Check size={15} className="text-[#C9A227] mt-0.5 shrink-0" /> {p}
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-slate-500 text-sm mb-6">Limited VIP capacity</p>
+                <div className="flex items-center justify-between gap-4 mb-5">
+                  <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227]">{vip.name}</p>
+                  <p className="font-display font-black text-2xl sm:text-3xl" data-testid="vip-price">{czk(vip.price_czk)}</p>
+                </div>
                 <button
                   data-testid={`buy-ticket-button-${vip.id}`}
                   disabled={vipOut}
@@ -259,9 +240,47 @@ export default function Tickets({ tiers = [], event }) {
                   {vipOut ? "Sold Out" : "Buy VIP"}
                 </button>
               </div>
-            </Reveal>
-          )}
-        </div>
+            )}
+          </div>
+        </Reveal>
+
+        <Reveal className="lg:order-1">
+          <div className="max-w-md mx-auto lg:mx-0" data-testid="ticket-details">
+            <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-4">Details</p>
+            <h2 className="font-display text-xl sm:text-2xl font-extrabold uppercase tracking-tight mb-6">
+              What your ticket <span className="text-[#FF0055]">includes</span>
+            </h2>
+            <ul className="space-y-3 text-sm text-slate-300">
+              {[
+                "Access to all 3 stages — Seoul Floor (7th), Mainstream Floor (6th), Saigon Floor (5th)",
+                "27.09.2026 · doors 20:00, party until 05:00",
+                "DUPLEX Prague · Václavské náměstí 831/21, Praha 1",
+                "Instant e-ticket with unique QR code by email",
+                "Transferable — only the QR code is checked at the door",
+                "Strictly 18+ · valid ID required at entry",
+              ].map((d) => (
+                <li key={d} className="flex items-start gap-2.5">
+                  <Check size={15} className="text-[#00F0FF] mt-0.5 shrink-0" /> {d}
+                </li>
+              ))}
+            </ul>
+            <p className="font-mono2 text-[10px] uppercase tracking-[0.15em] text-slate-600 mt-6 leading-relaxed" data-testid="ticket-no-refund-note">
+              Tickets are non-refundable · full refund only if the event is cancelled by the organizer
+            </p>
+            {vip && (vip.perks || []).length > 0 && (
+              <div className="mt-8 pt-6 border-t border-white/5">
+                <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#C9A227] mb-4">VIP All Access adds</p>
+                <ul className="space-y-2.5 text-sm text-slate-300">
+                  {vip.perks.map((p) => (
+                    <li key={p} className="flex items-start gap-2.5">
+                      <Check size={15} className="text-[#C9A227] mt-0.5 shrink-0" /> {p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </Reveal>
       </div>
 
       <AnimatePresence>

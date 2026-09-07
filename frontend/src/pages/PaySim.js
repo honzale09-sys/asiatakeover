@@ -32,7 +32,7 @@ export default function PaySim() {
     <div className="min-h-screen bg-[#060609] text-white flex items-center justify-center px-4" data-testid="pay-sim-page">
       <div className="w-full max-w-md border-2 border-dashed border-[#FFE600]/50 rounded-3xl p-8 text-center bg-[#0D0E15]">
         <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#FFE600] mb-3" data-testid="pay-sim-badge">
-          Test mode — simulated GoPay payment
+          Test mode — simulated payment
         </p>
         {order === false && <p className="text-slate-400 text-sm">Order not found.</p>}
         {order && (
@@ -71,8 +71,8 @@ export default function PaySim() {
         )}
         {error && <p className="text-[#FF0055] font-mono2 text-xs mt-4">{error}</p>}
         <p className="font-mono2 text-[10px] text-slate-600 mt-8 leading-relaxed">
-          No real payment is processed. This page only exists until GoPay credentials are configured — then customers are
-          redirected to the real GoPay gateway instead.
+          No real payment is processed. This page only exists until Teya credentials are configured — then customers are
+          redirected to the real Teya gateway instead.
         </p>
       </div>
     </div>

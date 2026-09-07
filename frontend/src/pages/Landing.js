@@ -21,7 +21,7 @@ const FALLBACK = {
   },
   tiers: [],
   content: {
-    contact_email: "jalimaks@seznam.cz",
+    contact_email: "hello@asiatakeover.com",
     instagram: "@asiatakeover_prague",
   },
 };

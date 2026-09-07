@@ -3,11 +3,11 @@ import { Link } from "react-router-dom";
 const SECTIONS = [
   {
     title: "1. Identifikace prodávajícího",
-    body: "Prodávajícím a pořadatelem akce ASIA TAKEOVER FESTIVAL je podnikatel, IČO: 22156879. Kontakt: e-mail jalimaks@seznam.cz, telefon +420 774 384 616. Akce se koná 27. září 2026 v klubu DUPLEX, Václavské náměstí 831/21, 110 00 Praha 1. Tyto obchodní podmínky upravují vztah mezi prodávajícím a zákazníkem při nákupu vstupenek prostřednictvím webu asiatakeover.cz.",
+    body: "Prodávajícím a pořadatelem akce ASIA TAKEOVER FESTIVAL je podnikatel, IČO: 22156879. Kontakt: e-mail hello@asiatakeover.com, telefon +420 774 384 616. Akce se koná 27. září 2026 v klubu DUPLEX, Václavské náměstí 831/21, 110 00 Praha 1. Tyto obchodní podmínky upravují vztah mezi prodávajícím a zákazníkem při nákupu vstupenek prostřednictvím webu asiatakeover.cz.",
   },
   {
     title: "2. Předmět smlouvy",
-    body: "Předmětem smlouvy je vstupenka (vstupové oprávnění) na akci ASIA TAKEOVER FESTIVAL dne 27. 9. 2026. Jedna vstupenka opravňuje k jednomu vstupu jedné osoby a je platná ve všech třech sálech akce (Seoul Room, Mainstream Room, Gangshii Room). Vstupenky jsou přenositelné — při vstupu se ověřuje pouze QR kód, nikoliv jméno.",
+    body: "Předmětem smlouvy je vstupenka (vstupové oprávnění) na akci ASIA TAKEOVER FESTIVAL dne 27. 9. 2026. Jedna vstupenka opravňuje k jednomu vstupu jedné osoby a je platná ve všech třech stagech akce (Seoul Floor, Mainstream Floor, Saigon Floor). Vstupenky jsou přenositelné — při vstupu se ověřuje pouze QR kód, nikoliv jméno.",
   },
   {
     title: "3. Objednávka a uzavření smlouvy",
@@ -15,19 +15,19 @@ const SECTIONS = [
   },
   {
     title: "4. Ceny a platební podmínky",
-    body: "Všechny ceny jsou uvedeny v českých korunách (CZK) včetně DPH, je-li prodávající plátcem DPH. Platba probíhá online prostřednictvím platební brány GoPay (platební karty, Apple Pay, Google Pay, bankovní převody a další metody dle nabídky brány). Údaje o platební kartě zadává zákazník výhradně v zabezpečeném prostředí platební brány GoPay; prodávající k nim nemá přístup a nikam je neukládá.",
+    body: "Všechny ceny jsou uvedeny v českých korunách (CZK) včetně DPH, je-li prodávající plátcem DPH. Platba probíhá online prostřednictvím platební brány Teya (platební karty a další metody dle nabídky brány) se zabezpečením 3-D Secure. Údaje o platební kartě zadává zákazník výhradně v zabezpečeném prostředí platební brány Teya; prodávající k nim nemá přístup a nikam je neukládá.",
   },
   {
     title: "5. Doručení vstupenek",
-    body: "Vstupenky jsou doručovány elektronicky na e-mail uvedený v objednávce bezprostředně po úspěšném zaplacení. Každá vstupenka obsahuje unikátní QR kód. Pokud e-mail nedorazí, zkontrolujte prosím složku Spam a případně nás kontaktujte na jalimaks@seznam.cz nebo +420 774 384 616 — vstupenky vám obratem přeposíláme.",
+    body: "Vstupenky jsou doručovány elektronicky na e-mail uvedený v objednávce bezprostředně po úspěšném zaplacení. Každá vstupenka obsahuje unikátní QR kód. Pokud e-mail nedorazí, zkontrolujte prosím složku Spam a případně nás kontaktujte na hello@asiatakeover.com nebo +420 774 384 616 — vstupenky vám obratem přeposíláme.",
   },
   {
-    title: "6. Odstoupení od smlouvy",
-    body: "Vstupenka je službou v oblasti volného času s pevně stanoveným termínem konání, proto na ni podle § 1837 písm. l) občanského zákoníku NEPLATÍ právo na odstoupení od smlouvy ve 14denní lhůtě. Dobrovolně však nabízíme vrácení peněz za vstupenky na základě písemné žádosti zaslané na jalimaks@seznam.cz nejpozději 7 dní před konáním akce (tedy do 20. 9. 2026 včetně).",
+    title: "6. Odstoupení od smlouvy — NO REFUND POLICY",
+    body: "Vstupenka je službou v oblasti volného času s pevně stanoveným termínem konání, proto na ni podle § 1837 písm. l) občanského zákoníku NEPLATÍ právo na odstoupení od smlouvy ve 14denní lhůtě. Všechny vstupenky jsou NEVRATNÉ (no refund) — zaplacenou vstupenku nelze vrátit ani vyměnit a prodávající neposkytuje žádné dobrovolné vrácení peněz. Vstupenku však můžete volně převést na jinou osobu — u vstupu se ověřuje pouze QR kód, nikoliv jméno. Plnou náhradu vstupného poskytujeme pouze v případě, že pořadatel akci zruší jako celek.",
   },
   {
     title: "7. Reklamace a vrácení peněz",
-    body: "Reklamace (např. nedoručené nebo nefunkční vstupenky, chybně stržená částka) zasílejte na jalimaks@seznam.cz nebo volejte +420 774 384 616. Reklamaci vyřídíme bez zbytečného odkladu, nejpozději do 30 dnů. Při zrušení akce pořadatelem budou všechny vstupenky plně refundovány na původní platební metodu. Refundované vstupenky jsou zneplatněny a nelze s nimi vstoupit na akci.",
+    body: "Reklamace (např. nedoručené nebo nefunkční vstupenky, chybně stržená částka) zasílejte na hello@asiatakeover.com nebo volejte +420 774 384 616. Reklamaci vyřídíme bez zbytečného odkladu, nejpozději do 30 dnů. Při zrušení akce pořadatelem budou všechny vstupenky plně refundovány na původní platební metodu. Refundované vstupenky jsou zneplatněny a nelze s nimi vstoupit na akci.",
   },
   {
     title: "8. Vstupní podmínky",
@@ -39,7 +39,7 @@ const SECTIONS = [
   },
   {
     title: "10. Ochrana osobních údajů",
-    body: "Osobní údaje (jméno, e-mail) zpracováváme pouze pro vyřízení objednávky, doručení vstupenek a komunikaci k akci, v souladu s nařízením GDPR. Platební údaje zpracovává výhradně platební brána GoPay. Marketingové účely (Meta Pixel) pouze s vaším souhlasem, který lze kdykoli odvolat.",
+    body: "Osobní údaje (jméno, e-mail) zpracováváme pouze pro vyřízení objednávky, doručení vstupenek a komunikaci k akci, v souladu s nařízením GDPR. Platební údaje zpracovává výhradně platební brána Teya. Marketingové účely (Meta Pixel) pouze s vaším souhlasem, který lze kdykoli odvolat.",
   },
   {
     title: "11. Mimosoudní řešení sporů",
@@ -62,7 +62,7 @@ export default function Terms() {
           <p className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-500 mb-2">Prodávající / pořadatel</p>
           <p className="text-sm text-slate-300 leading-relaxed">
             IČO: 22156879<br />
-            E-mail: jalimaks@seznam.cz<br />
+            E-mail: hello@asiatakeover.com<br />
             Telefon: +420 774 384 616<br />
             Místo konání: DUPLEX, Václavské náměstí 831/21, 110 00 Praha 1
           </p>

@@ -3,11 +3,11 @@ import { Link } from "react-router-dom";
 const SECTIONS = [
   {
     title: "Správce osobních údajů",
-    body: "Správcem osobních údajů je pořadatel akce ASIA TAKEOVER FESTIVAL, IČO: 22156879, kontakt: jalimaks@seznam.cz, +420 774 384 616.",
+    body: "Správcem osobních údajů je pořadatel akce ASIA TAKEOVER FESTIVAL, IČO: 22156879, kontakt: hello@asiatakeover.com, +420 774 384 616.",
   },
   {
     title: "Jaké údaje zpracováváme a proč",
-    body: "Jméno a e-mail — pro vyřízení objednávky, doručení vstupenek a komunikaci k akci (plnění smlouvy). Platební údaje zpracovává výhradně platební brána GoPay — k údajům o kartě nemáme přístup. Technické údaje (IP adresa, prohlížeč) — pro zabezpečení plateb a ochranu proti zneužití.",
+    body: "Jméno a e-mail — pro vyřízení objednávky, doručení vstupenek a komunikaci k akci (plnění smlouvy). Platební údaje zpracovává výhradně platební brána Teya — k údajům o kartě nemáme přístup. Technické údaje (IP adresa, prohlížeč) — pro zabezpečení plateb a ochranu proti zneužití.",
   },
   {
     title: "Marketingové měření (Meta Pixel)",
@@ -19,7 +19,7 @@ const SECTIONS = [
   },
   {
     title: "Vaše práva",
-    body: "Máte právo na přístup k údajům, opravu, výmaz, omezení zpracování, přenositelnost a právo podat stížnost u Úřadu pro ochranu osobních údajů (www.uoou.cz). Kontakt: jalimaks@seznam.cz.",
+    body: "Máte právo na přístup k údajům, opravu, výmaz, omezení zpracování, přenositelnost a právo podat stížnost u Úřadu pro ochranu osobních údajů (www.uoou.cz). Kontakt: hello@asiatakeover.com.",
   },
   {
     title: "Doba uchování",

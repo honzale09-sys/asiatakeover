@@ -201,6 +201,19 @@ META_CAPI_TOKEN = os.environ.get("META_CAPI_ACCESS_TOKEN", "")
 META_TEST_EVENT_CODE = os.environ.get("META_TEST_EVENT_CODE", "")
 META_API_VERSION = os.environ.get("META_API_VERSION", "v21.0")
 
+TEYA_ENV = os.environ.get("TEYA_ENV", "sandbox")
+TEYA_CLIENT_ID = os.environ.get("TEYA_CLIENT_ID", "")
+TEYA_CLIENT_SECRET = os.environ.get("TEYA_CLIENT_SECRET", "")
+TEYA_STORE_ID = os.environ.get("TEYA_STORE_ID", "")
+TEYA_WEBHOOK_SECRET = os.environ.get("TEYA_WEBHOOK_SECRET", "")
+
+TEYA_STATE_MAP = {
+    "SUCCESS": "paid", "SUCCEEDED": "paid", "COMPLETED": "paid", "AUTHORIZED": "paid",
+    "PENDING": "pending", "CREATED": "created", "SESSION_CREATED": "created",
+    "FAILED": "failed", "CANCELLED": "cancelled", "CANCELED": "cancelled",
+    "EXPIRED": "timeouted", "REFUNDED": "refunded", "PARTIALLY_REFUNDED": "partially_refunded",
+}
+
 GOPAY_STATE_MAP = {
     "CREATED": "created",
     "PAYMENT_METHOD_CHOSEN": "pending",
@@ -215,6 +228,114 @@ GOPAY_STATE_MAP = {
 
 def gopay_configured() -> bool:
     return bool(GOPAY_BASE_URL and GOPAY_GO_ID and GOPAY_CLIENT_ID and GOPAY_CLIENT_SECRET)
+
+
+def payment_sim_allowed() -> bool:
+    if os.environ.get("ALLOW_PAYMENT_SIM", "").lower() not in ("1", "true", "yes"):
+        return False
+    return "asiatakeover.com" not in SITE_URL
+
+
+# ---------------- Teya (hosted checkout) ----------------
+
+def teya_configured() -> bool:
+    return bool(TEYA_CLIENT_ID and TEYA_CLIENT_SECRET and TEYA_STORE_ID)
+
+
+def _teya_hosts():
+    prod = TEYA_ENV == "production"
+    return (
+        "https://api.teya.com" if prod else "https://api.teya.xyz",
+        "https://id.teya.com/oauth/v2/oauth-token" if prod else "https://id.teya.xyz/oauth/v2/oauth-token",
+    )
+
+
+_teya_token_cache = {"token": None, "exp": 0.0}
+
+
+async def teya_token() -> str:
+    if _teya_token_cache["token"] and _teya_token_cache["exp"] > time.time() + 60:
+        return _teya_token_cache["token"]
+    _, oauth = _teya_hosts()
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.post(
+            oauth,
+            data={"grant_type": "client_credentials",
+                  "scope": "checkout/sessions/create checkout/sessions/id/get"},
+            auth=(TEYA_CLIENT_ID, TEYA_CLIENT_SECRET),
+        )
+    if r.is_error:
+        logger.error("Teya auth failed: HTTP %s", r.status_code)
+        raise HTTPException(502, "Payment gateway authentication failed")
+    body = r.json()
+    _teya_token_cache["token"] = body["access_token"]
+    _teya_token_cache["exp"] = time.time() + int(body.get("expires_in", 1800))
+    return body["access_token"]
+
+
+async def teya_create_session(order: dict) -> dict:
+    api, _ = _teya_hosts()
+    token = await teya_token()
+    payload = {
+        "store_id": TEYA_STORE_ID,
+        "amount": {"currency": "CZK", "value": order["amount_czk"]},
+        "type": "SALE",
+        "merchant_reference": order["id"],
+        "success_url": f"{SITE_URL}/success?order_id={order['id']}",
+        "failure_url": f"{SITE_URL}/success?order_id={order['id']}",
+        "cancel_url": f"{SITE_URL}/tickets",
+        "post_success_payment": "REDIRECT",
+        "language": "cs-CZ",
+        "customer": {"email": order["buyer_email"]},
+        "metadata": {"order_id": order["id"]},
+    }
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.post(
+            f"{api}/v2/checkout/sessions",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Idempotency-Key": f"teya-{order['id']}"},
+        )
+    if r.is_error:
+        logger.error("Teya session create failed: HTTP %s — %s", r.status_code, r.text[:300])
+        raise HTTPException(502, "Payment gateway error")
+    return r.json()
+
+
+async def teya_get_session(session_id: str) -> dict:
+    api, _ = _teya_hosts()
+    token = await teya_token()
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.get(f"{api}/v2/checkout/sessions/{session_id}",
+                        headers={"Authorization": f"Bearer {token}"})
+    r.raise_for_status()
+    return r.json()
+
+
+async def teya_reconcile(session_id: str) -> str:
+    order = await db.orders.find_one({"teya_session_id": str(session_id)})
+    if not order:
+        raise HTTPException(404, "Unknown payment")
+    raw = await teya_get_session(session_id)
+    amount = raw.get("amount") or {}
+    if (raw.get("merchant_reference") not in (None, order["id"])
+            or (amount.get("value") is not None and int(amount["value"]) != order["amount_czk"])
+            or amount.get("currency", "CZK") != "CZK"):
+        logger.error("Teya session mismatch for order %s", order["id"])
+        raise HTTPException(400, "Payment does not match order")
+    state = str(raw.get("payment_status") or raw.get("session_status") or "CREATED").upper()
+    new_status = TEYA_STATE_MAP.get(state, "created")
+    await db.orders.update_one(
+        {"id": order["id"]},
+        {"$set": {"payment_status": new_status, "updated_at": utcnow().isoformat()}},
+    )
+    if new_status == "paid":
+        await fulfill_order(order["id"])
+    elif new_status in ("refunded", "partially_refunded"):
+        await db.tickets.update_many(
+            {"order_id": order["id"], "status": "valid"},
+            {"$set": {"status": "refunded"}},
+        )
+    return new_status
 
 
 _gopay_token_cache = {"token": None, "exp": 0.0}
@@ -642,17 +763,25 @@ async def create_order(data: OrderCreateIn, request: Request):
         "client_ip": ip,
         "user_agent": request.headers.get("user-agent"),
     }
-    if gopay_configured():
+    if teya_configured():
+        s = await teya_create_session(order)
+        order["teya_session_id"] = str(s["session_id"])
+        order["payment_provider"] = "teya"
+        payment_url = s["session_url"]
+        mode = "teya"
+    elif gopay_configured():
         p = await gopay_create_payment(order)
         order["gopay_payment_id"] = str(p["id"])
         payment_url = p["gw_url"]
         mode = "gopay"
-    else:
+    elif payment_sim_allowed():
         pid = f"SIM-{order['id']}"
         order["gopay_payment_id"] = pid
         payment_url = f"/pay/{order['id']}"
         mode = "simulation"
         await db.sim_payments.insert_one({"id": pid, "state": "CREATED", "order_id": order["id"]})
+    else:
+        raise HTTPException(503, "Online payments are temporarily unavailable")
     await db.orders.insert_one(order)
     return {
         "order_id": order["id"],
@@ -668,6 +797,13 @@ async def order_status(order_id: str):
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
         raise HTTPException(404, "Order not found")
+    if (order.get("teya_session_id") and teya_configured()
+            and order.get("payment_status") in (None, "created", "pending")):
+        try:
+            await teya_reconcile(order["teya_session_id"])
+            order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+        except Exception as e:
+            logger.warning("Teya sync for order %s failed: %s", order_id, str(e)[:150])
     return {
         "order_id": order["id"],
         "payment_status": order.get("payment_status", "created"),
@@ -715,6 +851,40 @@ async def gopay_return(id: str = Query(...)):
     dest = f"{SITE_URL}/success?order_id={order['id']}" if order else f"{SITE_URL}/success"
     return RedirectResponse(dest)
 
+@api_router.post("/payments/teya/notify")
+async def teya_notification(request: Request):
+    raw = await request.body()
+    if TEYA_WEBHOOK_SECRET:
+        import hashlib
+        import hmac as _hmac
+        sig = request.headers.get("X-Teya-Signature", "")
+        expected = _hmac.new(TEYA_WEBHOOK_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+        if not _hmac.compare_digest(expected, sig):
+            raise HTTPException(401, "Invalid Teya signature")
+    import json as _json
+    try:
+        event = _json.loads(raw)
+    except Exception:
+        raise HTTPException(400, "Bad payload")
+    event_id = event.get("id") or event.get("event_id")
+    if event_id and await db.meta_events.find_one({"event_id": f"teya_{event_id}"}):
+        return {"ok": True}
+    data = event.get("data", event)
+    sid = data.get("session_id") or data.get("checkout_session_id") or data.get("id")
+    if sid:
+        try:
+            await teya_reconcile(sid)
+        except HTTPException as e:
+            if e.status_code != 404:
+                raise HTTPException(502, "Reconciliation failed")
+        except Exception:
+            raise HTTPException(502, "Reconciliation failed")
+    if event_id:
+        await db.meta_events.insert_one({"event_id": f"teya_{event_id}", "received_at": utcnow().isoformat()})
+    return {"ok": True}
+
+
+
 
 class SimActionIn(BaseModel):
     order_id: str
@@ -723,7 +893,7 @@ class SimActionIn(BaseModel):
 
 @api_router.post("/payments/sim/action")
 async def sim_action(data: SimActionIn):
-    if gopay_configured():
+    if gopay_configured() or not payment_sim_allowed():
         raise HTTPException(404, "Not available")
     state = {"paid": "PAID", "failed": "CANCELED", "cancelled": "CANCELED",
              "timeout": "TIMEOUTED", "refunded": "REFUNDED"}.get(data.action)
@@ -881,6 +1051,17 @@ async def admin_orders(admin=Depends(get_current_admin)):
         o["tickets"] = await db.tickets.find({"order_id": o["id"]}, {"_id": 0}).to_list(50)
         o["payment_status"] = o.get("payment_status") or o.get("status", "paid_mock")
     return orders
+
+
+@api_router.post("/admin/purge-sales")
+async def admin_purge_sales(admin=Depends(get_current_admin)):
+    """TEMPORARY: one-off wipe of all orders/tickets/sim payments after mock-payment abuse."""
+    result = {}
+    for coll in ("orders", "tickets", "sim_payments", "meta_events"):
+        res = await db[coll].delete_many({})
+        result[coll] = res.deleted_count
+    logger.warning("ADMIN PURGE-SALES executed by %s: %s", admin.get("email"), result)
+    return {"ok": True, "deleted": result}
 
 
 @api_router.post("/admin/orders/{order_id}/resend-email")

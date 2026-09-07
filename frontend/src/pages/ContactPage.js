@@ -14,14 +14,14 @@ export default function ContactPage() {
         <h1 className="font-display font-extrabold text-2xl sm:text-3xl uppercase mb-10">Get in touch</h1>
         <div className="space-y-4">
           <a
-            href="mailto:jalimaks@seznam.cz"
+            href="mailto:hello@asiatakeover.com"
             data-testid="contact-email-card"
             className="flex items-center gap-4 border border-white/10 rounded-2xl bg-[#0D0E15] p-6 hover:border-[#FF0055]/60 transition-colors"
           >
             <Mail size={22} className="text-[#FF0055] shrink-0" />
             <div>
               <p className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-500">Email</p>
-              <p className="font-medium mt-1">jalimaks@seznam.cz</p>
+              <p className="font-medium mt-1">hello@asiatakeover.com</p>
             </div>
           </a>
           <a
@@ -60,7 +60,7 @@ export default function ContactPage() {
           For VIP tables, partnerships and press, email us and we'll get back to you within 48 hours.
         </p>
         <p className="font-mono2 text-[11px] text-slate-600 mt-6" data-testid="contact-company-info">
-          Provozovatel: IČO 22156879 · jalimaks@seznam.cz · +420 774 384 616
+          Provozovatel: IČO 22156879 · hello@asiatakeover.com · +420 774 384 616
         </p>
       </main>
     </div>

@@ -145,6 +145,7 @@ function OrdersTab() {
                   }`} data-testid={`order-status-${o.id.slice(0, 8)}`}>{o.payment_status}</span>
                   {o.paid_at && <p className="font-mono2 text-[10px] text-slate-600 mt-0.5">paid {new Date(o.paid_at).toLocaleString("cs-CZ")}</p>}
                   {o.gopay_payment_id && <p className="font-mono2 text-[10px] text-slate-600">gw {o.gopay_payment_id}</p>}
+                  {o.teya_session_id && <p className="font-mono2 text-[10px] text-slate-600">teya {o.teya_session_id}</p>}
                 </td>
                 <td className="px-4 py-3 font-mono2 text-[11px] text-slate-400" data-testid={`order-marketing-${o.id.slice(0, 8)}`}>
                   {(() => {
