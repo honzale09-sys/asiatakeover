@@ -126,7 +126,7 @@ function OrdersTab() {
         <table className="w-full text-sm" data-testid="orders-table">
           <thead>
             <tr className="border-b border-white/10 bg-[#0D0E15] font-mono2 text-[11px] uppercase tracking-[0.15em] text-slate-500">
-              {["Date", "Buyer", "Tier", "Qty", "Amount", "Ticket codes", "Payment", "Marketing", "Ticket email"].map((h) => (
+              {["Date", "Buyer", "Category", "Tier", "Qty", "Amount", "Ticket codes", "Payment", "Marketing", "Ticket email"].map((h) => (
                 <th key={h} className="text-left px-4 py-3 whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -138,6 +138,15 @@ function OrdersTab() {
                 <td className="px-4 py-3">
                   <p className="font-medium">{o.buyer_name}</p>
                   <p className="font-mono2 text-xs text-slate-500">{o.buyer_email}</p>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap" data-testid={`order-category-${o.id.slice(0, 8)}`}>
+                  <span className={`font-mono2 text-[10px] uppercase tracking-[0.15em] px-2.5 py-1 rounded-full border ${
+                    /vip/i.test(o.tier_name || "")
+                      ? "border-[#C9A227]/50 text-[#C9A227]"
+                      : "border-[#00F0FF]/40 text-[#00F0FF]"
+                  }`}>
+                    {/vip/i.test(o.tier_name || "") ? "VIP Table" : "Standard"}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-[#00F0FF] font-mono2 text-xs whitespace-nowrap">{o.tier_name}</td>
                 <td className="px-4 py-3">{o.quantity}</td>

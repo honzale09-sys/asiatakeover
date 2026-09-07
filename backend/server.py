@@ -227,6 +227,10 @@ GOPAY_STATE_MAP = {
 }
 
 
+def ticket_display_name(tier_name: str) -> str:
+    return "VIP Table Ticket" if "VIP" in (tier_name or "").upper() else "Standard Ticket"
+
+
 def gopay_configured() -> bool:
     return bool(GOPAY_BASE_URL and GOPAY_GO_ID and GOPAY_CLIENT_ID and GOPAY_CLIENT_SECRET)
 
@@ -765,7 +769,7 @@ async def create_order(data: OrderCreateIn, request: Request):
         "event_id": event["id"],
         "event_name": event["name"],
         "tier_id": tier["id"],
-        "tier_name": tier["name"],
+        "tier_name": ticket_display_name(tier["name"]),
         "quantity": data.quantity,
         "amount_czk": unit_price * data.quantity,
         "list_price_czk": tier["price_czk"],

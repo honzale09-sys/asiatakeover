@@ -10,6 +10,7 @@ const inputCls =
   "w-full bg-[#0D0E15] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:border-[#FF0055] outline-none transition-colors";
 
 function CheckoutModal({ tier, event, onClose }) {
+  const displayName = /vip/i.test(tier.name) ? "VIP Table Ticket" : "Standard Ticket";
   const [step, setStep] = useState("form");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -116,7 +117,7 @@ function CheckoutModal({ tier, event, onClose }) {
         {step === "form" && (
           <form onSubmit={pay}>
             <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-[#00F0FF] mb-2">Secure checkout</p>
-            <h3 className="font-display font-extrabold text-2xl uppercase mb-1">{tier.name}</h3>
+            <h3 className="font-display font-extrabold text-2xl uppercase mb-1">{displayName}</h3>
             <p className="text-slate-400 text-sm mb-6">
               {event.name} · {event.date_label} · {event.venue} {event.city}
             </p>
@@ -201,7 +202,7 @@ function CheckoutModal({ tier, event, onClose }) {
           <div data-testid="teya-embedded-checkout">
             <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-[#00F0FF] mb-2">Secure payment</p>
             <h3 className="font-display font-extrabold text-xl uppercase mb-1">
-              {tier.name} — {czk(totalPrice)}
+              {displayName} — {czk(totalPrice)}
             </h3>
             <p className="text-slate-400 text-sm mb-5">{qty} ticket{qty > 1 ? "s" : ""} · {email}</p>
             <div id="teya-checkout-container" data-testid="teya-checkout-container" className="bg-white rounded-xl overflow-hidden min-h-[320px]" />
@@ -267,7 +268,7 @@ export default function Tickets({ tiers = [], event }) {
                 <span className="absolute -top-3 left-6 bg-[#FF0055] font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full" data-testid="most-popular-badge">
                   Selling now
                 </span>
-                <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">{activeGA.name}</p>
+                <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">Standard Ticket</p>
                 <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="ga-price">{czk(activeGA.price_czk)}</p>
                 <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600] mb-6" data-testid="next-release">
                   {nextGA ? `Next release: ${czk(nextGA.price_czk)}` : "Final online ticket release"}
@@ -317,7 +318,7 @@ export default function Tickets({ tiers = [], event }) {
                   </span>
                 )}
                 <div className="flex items-center justify-between gap-4 mb-5">
-                  <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227]">{vip.name}</p>
+                  <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227]">VIP Table Ticket</p>
                   <p className="font-display font-black text-2xl sm:text-3xl" data-testid="vip-price">{czk(vip.price_czk)}</p>
                 </div>
                 <button
@@ -360,7 +361,7 @@ export default function Tickets({ tiers = [], event }) {
             </p>
             {vip && (
               <div className="mt-8 pt-6 border-t border-white/5">
-                <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#C9A227] mb-4">VIP All Access</p>
+                <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#C9A227] mb-4">VIP Table Ticket</p>
                 <ul className="space-y-2.5 text-sm text-slate-300" data-testid="vip-perks-list">
                   {[
                     "Access to all 3 stages",
