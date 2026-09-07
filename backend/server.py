@@ -424,7 +424,12 @@ async def send_email(*, to: str, subject: str, html: str, reply_to: Optional[str
             headers={"X-Email-Key": EMAIL_KEY},
             json=payload,
         )
-    resp.raise_for_status()
+    if resp.status_code == 422:
+        logger.error("Email rejected as undeliverable for %s: %s", to, resp.text[:200])
+        raise RuntimeError("Undeliverable recipient — email API blocked this address (422). Check the buyer email is real.")
+    if resp.status_code >= 400:
+        logger.error("Email send rejected: HTTP %s — %s", resp.status_code, resp.text[:300])
+        raise RuntimeError(f"email API HTTP {resp.status_code}: {resp.text[:200]}")
     return resp.json().get("id")
 
 
@@ -530,10 +535,10 @@ async def fulfill_order(order_id: str):
                       "ticket_email_id": email_id, "ticket_email_error": None}},
         )
     except Exception as e:
-        logger.error("Ticket email failed for order %s: %s", order_id, type(e).__name__)
+        logger.error("Ticket email failed for order %s: %s", order_id, str(e)[:250])
         await db.orders.update_one(
             {"id": order_id},
-            {"$set": {"ticket_email_error": type(e).__name__}},
+            {"$set": {"ticket_email_error": str(e)[:250]}},
         )
     logger.info("Order %s fulfilled: %d ticket(s) issued", order["id"], order["quantity"])
 
@@ -894,9 +899,13 @@ async def resend_ticket_email(order_id: str, admin=Depends(get_current_admin)):
         )
         return {"ok": True, "email_id": email_id}
     except Exception as e:
+        logger.error("Admin resend email failed for order %s: %s", order_id, str(e)[:250])
         await db.orders.update_one(
-            {"id": order_id}, {"$set": {"ticket_email_error": type(e).__name__}})
-        raise HTTPException(502, "Email send failed")
+            {"id": order_id}, {"$set": {"ticket_email_error": str(e)[:250]}})
+        msg = str(e)[:200]
+        if "Undeliverable recipient" in msg:
+            raise HTTPException(422, msg)
+        raise HTTPException(502, f"Email send failed: {msg}")
 
 
 @api_router.get("/admin/messages")
