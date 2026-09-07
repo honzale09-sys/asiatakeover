@@ -205,7 +205,7 @@ TEYA_ENV = os.environ.get("TEYA_ENV", "sandbox")
 TEYA_CLIENT_ID = os.environ.get("TEYA_CLIENT_ID", "")
 TEYA_CLIENT_SECRET = os.environ.get("TEYA_CLIENT_SECRET", "")
 TEYA_STORE_ID = os.environ.get("TEYA_STORE_ID", "")
-TEYA_WEBHOOK_SECRET = os.environ.get("TEYA_WEBHOOK_SECRET", "")
+TEYA_WEBHOOK_PUBLIC_KEY = os.environ.get("TEYA_WEBHOOK_PUBLIC_KEY", "")
 
 TEYA_STATE_MAP = {
     "SUCCESS": "paid", "SUCCEEDED": "paid", "COMPLETED": "paid", "AUTHORIZED": "paid",
@@ -278,7 +278,7 @@ async def teya_create_session(order: dict) -> dict:
     token = await teya_token()
     payload = {
         "store_id": TEYA_STORE_ID,
-        "amount": {"currency": "CZK", "value": order["amount_czk"]},
+        "amount": {"currency": "CZK", "value": order["amount_czk"] * 100},
         "type": "SALE",
         "merchant_reference": order["id"],
         "success_url": f"{SITE_URL}/success?order_id={order['id']}",
@@ -318,7 +318,7 @@ async def teya_reconcile(session_id: str) -> str:
     raw = await teya_get_session(session_id)
     amount = raw.get("amount") or {}
     if (raw.get("merchant_reference") not in (None, order["id"])
-            or (amount.get("value") is not None and int(amount["value"]) != order["amount_czk"])
+            or (amount.get("value") is not None and int(amount["value"]) != order["amount_czk"] * 100)
             or amount.get("currency", "CZK") != "CZK"):
         logger.error("Teya session mismatch for order %s", order["id"])
         raise HTTPException(400, "Payment does not match order")
@@ -854,12 +854,18 @@ async def gopay_return(id: str = Query(...)):
 @api_router.post("/payments/teya/notify")
 async def teya_notification(request: Request):
     raw = await request.body()
-    if TEYA_WEBHOOK_SECRET:
-        import hashlib
-        import hmac as _hmac
+    if TEYA_WEBHOOK_PUBLIC_KEY:
         sig = request.headers.get("X-Teya-Signature", "")
-        expected = _hmac.new(TEYA_WEBHOOK_SECRET.encode(), raw, hashlib.sha256).hexdigest()
-        if not _hmac.compare_digest(expected, sig):
+        try:
+            import textwrap
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+            b64 = "".join(TEYA_WEBHOOK_PUBLIC_KEY.split())
+            if "BEGIN PUBLIC KEY" not in b64:
+                b64 = "-----BEGIN PUBLIC KEY-----\n" + "\n".join(textwrap.wrap(b64, 64)) + "\n-----END PUBLIC KEY-----\n"
+            pk = serialization.load_pem_public_key(b64.encode())
+            pk.verify(base64.b64decode(sig), raw, asym_padding.PKCS1v15(), hashes.SHA256())
+        except Exception:
             raise HTTPException(401, "Invalid Teya signature")
     import json as _json
     try:
