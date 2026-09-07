@@ -15,8 +15,30 @@ function CheckoutModal({ tier, event, onClose }) {
   const [email, setEmail] = useState("");
   const [qty, setQty] = useState(1);
   const [payment, setPayment] = useState(null);
+  const [promoInput, setPromoInput] = useState("");
+  const [promoApplied, setPromoApplied] = useState(null);
   const left = Math.max(0, tier.capacity - (tier.sold || 0));
   const maxQty = Math.min(10, left || 10);
+  const unitPrice = promoApplied
+    ? Math.max(1, Math.round((tier.price_czk * (100 - promoApplied.percent)) / 100))
+    : tier.price_czk;
+  const totalPrice = unitPrice * qty;
+
+  const applyPromo = async () => {
+    if (!promoInput.trim()) return;
+    try {
+      const r = await api.get(`/promo/validate?code=${encodeURIComponent(promoInput.trim())}`);
+      if (r.data.valid) {
+        setPromoApplied({ code: promoInput.trim().toUpperCase(), percent: r.data.percent_off });
+        toast.success(`Discount applied — ${r.data.percent_off}% off`);
+      } else {
+        setPromoApplied(null);
+        toast.error("Invalid discount code");
+      }
+    } catch {
+      toast.error("Could not validate the code — try again");
+    }
+  };
 
   useEffect(() => {
     trackEvent("InitiateCheckout", {
@@ -63,6 +85,7 @@ function CheckoutModal({ tier, event, onClose }) {
         quantity: qty,
         name,
         email,
+        promo_code: promoApplied ? promoApplied.code : undefined,
         attribution: buildOrderAttribution(),
         marketing_consent: marketingAllowed(),
       });
@@ -122,15 +145,40 @@ function CheckoutModal({ tier, event, onClose }) {
                 </select>
               </div>
             </div>
+            <div className="mt-6">
+              <label className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-slate-400">Discount code</label>
+              <div className="flex gap-2 mt-1.5">
+                <input
+                  value={promoInput}
+                  onChange={(e) => { setPromoInput(e.target.value); setPromoApplied(null); }}
+                  placeholder="Enter code"
+                  data-testid="checkout-promo-input"
+                  className="flex-1 bg-black/50 border border-white/15 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F0FF] uppercase placeholder:normal-case"
+                />
+                <button
+                  type="button"
+                  onClick={applyPromo}
+                  data-testid="checkout-promo-apply"
+                  className="font-mono2 text-xs uppercase tracking-[0.15em] border border-white/25 hover:border-[#00F0FF] hover:text-[#00F0FF] rounded-xl px-5 transition-colors"
+                >
+                  Apply
+                </button>
+              </div>
+              {promoApplied && (
+                <p className="font-mono2 text-[11px] text-[#00F0FF] mt-2" data-testid="promo-applied-note">
+                  Code {promoApplied.code} applied: −{promoApplied.percent}% (list price {czk(tier.price_czk * qty)})
+                </p>
+              )}
+            </div>
             <button
               type="submit"
               data-testid="checkout-pay-button"
               className="mt-6 w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-sm py-4 rounded-full transition-colors duration-300 shadow-[0_0_45px_rgba(255,106,0,0.35)]"
             >
-              Continue to Payment — {czk(tier.price_czk * qty)}
+              Continue to Payment — {czk(totalPrice)}
             </button>
             <p className="font-mono2 text-[11px] text-slate-500 mt-3 text-center">
-              You'll be redirected to the payment gateway. Tickets are issued only after the payment is confirmed.
+              Secure card payment by Teya, directly on this page. Tickets are issued only after the payment is confirmed.
             </p>
             <p className="font-mono2 text-[10px] text-slate-600 mt-2 text-center">
               By continuing you agree to our{" "}
@@ -153,7 +201,7 @@ function CheckoutModal({ tier, event, onClose }) {
           <div data-testid="teya-embedded-checkout">
             <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-[#00F0FF] mb-2">Secure payment</p>
             <h3 className="font-display font-extrabold text-xl uppercase mb-1">
-              {tier.name} — {czk(tier.price_czk * qty)}
+              {tier.name} — {czk(totalPrice)}
             </h3>
             <p className="text-slate-400 text-sm mb-5">{qty} ticket{qty > 1 ? "s" : ""} · {email}</p>
             <div id="teya-checkout-container" data-testid="teya-checkout-container" className="bg-white rounded-xl overflow-hidden min-h-[320px]" />

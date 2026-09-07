@@ -1,0 +1,35 @@
+{
+  "summary": "Tested new promo code feature (ATFTEST95, 95% off). Backend: 8/8 pytest tests pass — GET /api/promo/validate returns correct valid/percent_off for upper/lowercase codes, false for unknown; POST /api/orders/create with promo produces amount_czk=25 (qty1) and 50 (qty2), mode=teya, session_token present; invalid promo → HTTP 400 'Invalid discount code'; no-promo regression → 499. Frontend: /tickets checkout modal accepts ATFTEST95 via checkout-promo-input + checkout-promo-apply, shows promo-applied-note 'Code ATFTEST95 applied: −95% (list price 499 Kč)', pay button updates to 'CONTINUE TO PAYMENT — 25 KČ', embedded Teya form mounts (teya-embedded-checkout) with header '1ST RELEASE — 25 KČ' and inner 'Zaplatit 25,00 Kč' button (verified visually, no card entered). No-promo regression shows 499 Kč in modal + Teya. Invalid code shows 'Invalid discount code' toast and does not modify total.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/orders/create", "issue": "Response does not echo unit_price_czk / list_price_czk / discount_percent (they are persisted on the order document but not returned). amount_czk alone is returned. Consider including them in response for client transparency and easier verification."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Checkout modal / Tickets page", "issues": ["React hydration console warning: '<span> cannot be a child of <option>' from emergent x-file dev overlay wrappers inside the quantity <select>. Benign in production but pollutes console — consider stripping x-file wrappers from <option> children."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_promo.py", "/app/test_reports/pytest/promo_results.xml"],
+  "action_items": [
+    "(Optional) Return unit_price_czk, list_price_czk, discount_percent in POST /api/orders/create response",
+    "(Optional) Suppress hydration warning from emergent x-file wrapper inside <option> tags"
+  ],
+  "critical_code_review_comments": [
+    "Promo validation is applied server-side in create_order — good, promo cannot be spoofed from client.",
+    "unit_price uses max(1, round(...)) preventing 0 CZK abuse — good.",
+    "Teya session amount uses discounted total in minor units (amount_czk * 100) — verified via 25 KČ display in embedded Teya form.",
+    "Sold-out / gating: not explicitly re-tested via UI in this run, but code path applies promo AFTER standard tier/quantity checks in create_order, so gating is not bypassed (implicit)."
+  ],
+  "updated_files": ["/app/backend/tests/test_promo.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "LOCKDOWN via localStorage: atf_unlocked=1, atf_unlocked_at=Date.now()",
+  "seed_data_creation": "Backend seeds promo_codes: ATFTEST95 (95% off, active) on startup — confirmed working.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Promo endpoint uses upper-case normalization; buyer field names in POST /api/orders/create are 'name' and 'email' (not buyer_name/buyer_email). Frontend testids: checkout-promo-input, checkout-promo-apply, promo-applied-note, teya-embedded-checkout, teya-checkout-container, buy-ticket-button-{tierId}, checkout-modal, checkout-quantity. GA active tier id: 7425d4a5cf0349e39ca3c37bacefaaf7.",
+  "rca of the issue": "N/A — feature works as specified. Minor DX/observability suggestions only."
+}

@@ -187,6 +187,7 @@ class OrderCreateIn(BaseModel):
     email: EmailStr
     attribution: Optional[AttributionIn] = None
     marketing_consent: bool = False
+    promo_code: Optional[str] = None
 
 
 # ---------------- payments config ----------------
@@ -714,6 +715,14 @@ def rate_limit(ip: str, limit: int = 10, window: int = 300):
     _rate_hits[ip] = hits
 
 
+@api_router.get("/promo/validate")
+async def promo_validate(code: str):
+    promo = await db.promo_codes.find_one({"code": code.strip().upper(), "active": True})
+    if not promo:
+        return {"valid": False}
+    return {"valid": True, "percent_off": promo["percent_off"]}
+
+
 @api_router.post("/orders/create")
 async def create_order(data: OrderCreateIn, request: Request):
     ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (
@@ -741,6 +750,14 @@ async def create_order(data: OrderCreateIn, request: Request):
     sold = await db.tickets.count_documents({"tier_id": tier["id"]})
     if sold + data.quantity > tier["capacity"]:
         raise HTTPException(400, "Not enough tickets left in this tier")
+    unit_price = tier["price_czk"]
+    discount_percent = None
+    if data.promo_code:
+        promo = await db.promo_codes.find_one({"code": data.promo_code.strip().upper(), "active": True})
+        if not promo:
+            raise HTTPException(400, "Invalid discount code")
+        discount_percent = promo["percent_off"]
+        unit_price = max(1, round(unit_price * (100 - discount_percent) / 100))
     order = {
         "id": new_id(),
         "created_at": utcnow().isoformat(),
@@ -750,7 +767,11 @@ async def create_order(data: OrderCreateIn, request: Request):
         "tier_id": tier["id"],
         "tier_name": tier["name"],
         "quantity": data.quantity,
-        "amount_czk": tier["price_czk"] * data.quantity,
+        "amount_czk": unit_price * data.quantity,
+        "list_price_czk": tier["price_czk"],
+        "unit_price_czk": unit_price,
+        "promo_code": data.promo_code.strip().upper() if discount_percent else None,
+        "discount_percent": discount_percent,
         "currency": "CZK",
         "buyer_name": data.name,
         "buyer_email": data.email.lower(),
@@ -1280,6 +1301,12 @@ async def startup():
     await db.tickets.create_index("order_id")
     await db.sim_payments.create_index("id", unique=True)
     await db.meta_events.create_index("event_id", unique=True)
+    await db.promo_codes.create_index("code", unique=True)
+    await db.promo_codes.update_one(
+        {"code": "ATFTEST95"},
+        {"$setOnInsert": {"code": "ATFTEST95", "percent_off": 95, "active": True}},
+        upsert=True,
+    )
     await seed_admin()
     await seed_event()
 
