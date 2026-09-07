@@ -14,6 +14,7 @@ function CheckoutModal({ tier, event, onClose }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [qty, setQty] = useState(1);
+  const [payment, setPayment] = useState(null);
   const left = Math.max(0, tier.capacity - (tier.sold || 0));
   const maxQty = Math.min(10, left || 10);
 
@@ -28,6 +29,31 @@ function CheckoutModal({ tier, event, onClose }) {
     }, `ic_${tier.id}_${Date.now()}`);
   }, [tier]);
 
+  useEffect(() => {
+    if (step !== "payment" || !payment) return;
+    let el = null;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { initTeyaBlocks } = await import("@teyaproduct/teya-blocks-js");
+        const teya = await initTeyaBlocks(payment.sessionToken, { locale: "cs-CZ" });
+        if (cancelled) return;
+        if (!teya) throw new Error("sdk init failed");
+        el = teya.elements.createCheckout({
+          onSuccess: () => window.location.assign(`/success?order_id=${payment.orderId}`),
+          onError: () => toast.error("Payment failed — please try again."),
+        });
+        el.mount("#teya-checkout-container");
+      } catch {
+        if (!cancelled) toast.error("Payment form failed to load — please refresh and try again.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      try { el && el.unmount(); } catch { /* noop */ }
+    };
+  }, [step, payment]);
+
   const pay = async (e) => {
     e.preventDefault();
     setStep("processing");
@@ -40,7 +66,12 @@ function CheckoutModal({ tier, event, onClose }) {
         attribution: buildOrderAttribution(),
         marketing_consent: marketingAllowed(),
       });
-      window.location.assign(r.data.payment_url);
+      if (r.data.mode === "teya" && r.data.session_token) {
+        setPayment({ orderId: r.data.order_id, sessionToken: r.data.session_token });
+        setStep("payment");
+      } else {
+        window.location.assign(r.data.payment_url);
+      }
     } catch (e2) {
       toast.error(formatError(e2));
       setStep("form");
@@ -115,6 +146,20 @@ function CheckoutModal({ tier, event, onClose }) {
           <div className="py-16 flex flex-col items-center gap-5" data-testid="checkout-processing">
             <div className="w-12 h-12 rounded-full border-2 border-white/15 border-t-[#FF6A00] animate-spin" />
             <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-slate-400">Creating your order…</p>
+          </div>
+        )}
+
+        {step === "payment" && payment && (
+          <div data-testid="teya-embedded-checkout">
+            <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-[#00F0FF] mb-2">Secure payment</p>
+            <h3 className="font-display font-extrabold text-xl uppercase mb-1">
+              {tier.name} — {czk(tier.price_czk * qty)}
+            </h3>
+            <p className="text-slate-400 text-sm mb-5">{qty} ticket{qty > 1 ? "s" : ""} · {email}</p>
+            <div id="teya-checkout-container" data-testid="teya-checkout-container" className="bg-white rounded-xl overflow-hidden min-h-[320px]" />
+            <p className="font-mono2 text-[10px] text-slate-600 mt-3 text-center">
+              Payments are processed by Teya. Tickets with QR codes arrive by email right after the payment is confirmed.
+            </p>
           </div>
         )}
       </div>

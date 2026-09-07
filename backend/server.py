@@ -769,6 +769,7 @@ async def create_order(data: OrderCreateIn, request: Request):
         order["payment_provider"] = "teya"
         payment_url = s["session_url"]
         mode = "teya"
+        order["teya_session_token"] = s["session_token"]
     elif gopay_configured():
         p = await gopay_create_payment(order)
         order["gopay_payment_id"] = str(p["id"])
@@ -789,6 +790,7 @@ async def create_order(data: OrderCreateIn, request: Request):
         "mode": mode,
         "amount_czk": order["amount_czk"],
         "currency": "CZK",
+        "session_token": order.get("teya_session_token"),
     }
 
 
@@ -1057,17 +1059,6 @@ async def admin_orders(admin=Depends(get_current_admin)):
         o["tickets"] = await db.tickets.find({"order_id": o["id"]}, {"_id": 0}).to_list(50)
         o["payment_status"] = o.get("payment_status") or o.get("status", "paid_mock")
     return orders
-
-
-@api_router.post("/admin/purge-sales")
-async def admin_purge_sales(admin=Depends(get_current_admin)):
-    """TEMPORARY: one-off wipe of all orders/tickets/sim payments after mock-payment abuse."""
-    result = {}
-    for coll in ("orders", "tickets", "sim_payments", "meta_events"):
-        res = await db[coll].delete_many({})
-        result[coll] = res.deleted_count
-    logger.warning("ADMIN PURGE-SALES executed by %s: %s", admin.get("email"), result)
-    return {"ok": True, "deleted": result}
 
 
 @api_router.post("/admin/orders/{order_id}/resend-email")
