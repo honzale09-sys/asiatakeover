@@ -73,6 +73,17 @@ function OrdersTab() {
     }
   };
 
+  const removeOrder = async (id) => {
+    if (!window.confirm("Really delete this order and its tickets? The QR codes will stop working.")) return;
+    try {
+      const r = await api.delete(`/admin/orders/${id}`);
+      toast.success(`Order deleted (${r.data.deleted_tickets} tickets removed)`);
+      load();
+    } catch (e) {
+      toast.error(formatError(e));
+    }
+  };
+
   const filtered = orders.filter((o) => {
     const hay = `${o.buyer_name} ${o.buyer_email} ${o.tier_name} ${o.tickets.map((t) => t.code).join(" ")}`.toLowerCase();
     return hay.includes(q.toLowerCase());
@@ -177,6 +188,13 @@ function OrdersTab() {
                       resend tickets
                     </button>
                   )}
+                  <button
+                    onClick={() => removeOrder(o.id)}
+                    data-testid={`delete-order-${o.id.slice(0, 8)}`}
+                    className="block mt-1 text-[#FF0055] hover:underline"
+                  >
+                    delete
+                  </button>
                 </td>
               </tr>
             ))}
@@ -298,7 +316,7 @@ function EventsTab() {
         <input required className={inputCls} placeholder="Event name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="event-name-input" />
         <div className="grid grid-cols-2 gap-4">
           <div><label className={labelCls}>Date label</label><input className={inputCls} placeholder="27.09.2026" value={form.date_label} onChange={(e) => setForm({ ...form, date_label: e.target.value })} data-testid="event-date-label-input" /></div>
-          <div><label className={labelCls}>ISO date/time</label><input className={inputCls} placeholder="2026-09-27T20:00:00+02:00" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} data-testid="event-date-input" /></div>
+          <div><label className={labelCls}>ISO date/time</label><input className={inputCls} placeholder="2026-09-27T22:00:00+02:00" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} data-testid="event-date-input" /></div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div><label className={labelCls}>Venue</label><input className={inputCls} placeholder="DUPLEX" value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })} data-testid="event-venue-input" /></div>

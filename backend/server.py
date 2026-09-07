@@ -594,7 +594,7 @@ def build_ticket_email_html(order: dict, tickets: list) -> str:
         f'<p style="font-size:13px;color:#ffffff;margin:18px 0 8px">Each QR code above is ONE individual entry.</p>'
         f'<p style="font-size:12px;color:#94A3B8;line-height:1.7;margin:0">'
         f'Do not share your QR codes publicly — anyone holding them can enter. '
-        f'Have the QR codes ready on your phone at the entrance. Doors open 20:00, 18+ with valid ID.</p>'
+        f'Have the QR codes ready on your phone at the entrance. Event runs 22:00–05:00, 18+ with valid ID.</p>'
         f'<p style="font-size:12px;margin:20px 0 0">'
         f'<a href="{SITE_URL}/success?order_id={escape(order["id"])}" style="color:#00F0FF">View your tickets online</a></p>'
         f'<p style="font-size:11px;color:#64748B;margin:24px 0 0">Sent by {escape(EMAIL_FROM_NAME)} · '
@@ -1082,6 +1082,18 @@ async def admin_orders(admin=Depends(get_current_admin)):
     return orders
 
 
+@api_router.delete("/admin/orders/{order_id}")
+async def admin_delete_order(order_id: str, admin=Depends(get_current_admin)):
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    t = await db.tickets.delete_many({"order_id": order_id})
+    await db.sim_payments.delete_many({"order_id": order_id})
+    await db.orders.delete_one({"id": order_id})
+    logger.warning("ADMIN %s deleted order %s (%s tickets)", admin.get("email"), order_id, t.deleted_count)
+    return {"ok": True, "deleted_tickets": t.deleted_count}
+
+
 @api_router.post("/admin/orders/{order_id}/resend-email")
 async def resend_ticket_email(order_id: str, admin=Depends(get_current_admin)):
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
@@ -1273,7 +1285,7 @@ async def seed_event():
         event = {
             "id": new_id(),
             "name": "ASIA TAKEOVER FESTIVAL 2026",
-            "date": "2026-09-27T20:00:00+02:00",
+            "date": "2026-09-27T22:00:00+02:00",
             "date_label": "27.09.2026",
             "venue": "DUPLEX",
             "address": "Václavské náměstí 831/21, 110 00 Praha 1",

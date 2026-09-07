@@ -99,7 +99,7 @@ export default function Hero({ event, tiers = [] }) {
               data-testid="buy-tickets-button"
               className="mt-7 inline-block whitespace-nowrap bg-[#FF6A00] hover:bg-[#FF8534] active:scale-95 text-white font-display font-bold uppercase text-xs sm:text-base tracking-[0.12em] sm:tracking-[0.15em] px-8 sm:px-12 py-4 rounded-full shadow-[0_0_24px_rgba(255,106,0,0.3)] transition-all duration-300 min-h-[54px]"
             >
-              Get {activeGA.name} — {activeGA.price_czk} CZK
+              Get Tickets
             </Link>
           ) : (
             <p className="mt-7 font-display font-bold uppercase text-sm tracking-[0.2em] text-slate-500" data-testid="hero-soldout-all">

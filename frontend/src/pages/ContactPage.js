@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Instagram, Mail, MapPin, Phone } from "lucide-react";
+import { Instagram, Mail, MapPin } from "lucide-react";
 
 export default function ContactPage() {
   return (
@@ -22,17 +22,6 @@ export default function ContactPage() {
             <div>
               <p className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-500">Email</p>
               <p className="font-medium mt-1">hello@asiatakeover.com</p>
-            </div>
-          </a>
-          <a
-            href="tel:+420774384616"
-            data-testid="contact-phone-card"
-            className="flex items-center gap-4 border border-white/10 rounded-2xl bg-[#0D0E15] p-6 hover:border-[#FFE600]/60 transition-colors"
-          >
-            <Phone size={22} className="text-[#FFE600] shrink-0" />
-            <div>
-              <p className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-500">Telefon</p>
-              <p className="font-medium mt-1">+420 774 384 616</p>
             </div>
           </a>
           <a
@@ -60,7 +49,7 @@ export default function ContactPage() {
           For VIP tables, partnerships and press, email us and we'll get back to you within 48 hours.
         </p>
         <p className="font-mono2 text-[11px] text-slate-600 mt-6" data-testid="contact-company-info">
-          Provozovatel: IČO 22156879 · hello@asiatakeover.com · +420 774 384 616
+          Provozovatel: NGUYEN TRUONG AN · Benkova 177/6, Chodov, Praha 11 · IČO 22156879 · hello@asiatakeover.com
         </p>
       </main>
     </div>

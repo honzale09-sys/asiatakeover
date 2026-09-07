@@ -12,7 +12,7 @@ const FALLBACK = {
   event: {
     id: "fallback",
     name: "ASIA TAKEOVER FESTIVAL 2026",
-    date: "2026-09-27T20:00:00+02:00",
+    date: "2026-09-27T22:00:00+02:00",
     date_label: "27.09.2026",
     venue: "DUPLEX",
     city: "Prague",

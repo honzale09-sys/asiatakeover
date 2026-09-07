@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 const SECTIONS = [
   {
     title: "1. Identifikace prodávajícího",
-    body: "Prodávajícím a pořadatelem akce ASIA TAKEOVER FESTIVAL je podnikatel, IČO: 22156879. Kontakt: e-mail hello@asiatakeover.com, telefon +420 774 384 616. Akce se koná 27. září 2026 v klubu DUPLEX, Václavské náměstí 831/21, 110 00 Praha 1. Tyto obchodní podmínky upravují vztah mezi prodávajícím a zákazníkem při nákupu vstupenek prostřednictvím webu asiatakeover.cz.",
+    body: "Prodávajícím a pořadatelem akce ASIA TAKEOVER FESTIVAL je podnikatel NGUYEN TRUONG AN, bydlištěm Benkova 177/6, Chodov, Praha 11, IČO: 22156879. Kontakt: e-mail hello@asiatakeover.com. Akce se koná 27. září 2026 v klubu DUPLEX, Václavské náměstí 831/21, 110 00 Praha 1. Tyto obchodní podmínky upravují vztah mezi prodávajícím a zákazníkem při nákupu vstupenek prostřednictvím webu asiatakeover.com.",
   },
   {
     title: "2. Předmět smlouvy",
@@ -19,7 +19,7 @@ const SECTIONS = [
   },
   {
     title: "5. Doručení vstupenek",
-    body: "Vstupenky jsou doručovány elektronicky na e-mail uvedený v objednávce bezprostředně po úspěšném zaplacení. Každá vstupenka obsahuje unikátní QR kód. Pokud e-mail nedorazí, zkontrolujte prosím složku Spam a případně nás kontaktujte na hello@asiatakeover.com nebo +420 774 384 616 — vstupenky vám obratem přeposíláme.",
+    body: "Vstupenky jsou doručovány elektronicky na e-mail uvedený v objednávce bezprostředně po úspěšném zaplacení. Každá vstupenka obsahuje unikátní QR kód. Pokud e-mail nedorazí, zkontrolujte prosím složku Spam a případně nás kontaktujte na hello@asiatakeover.com — vstupenky vám obratem přeposíláme.",
   },
   {
     title: "6. Odstoupení od smlouvy — NO REFUND POLICY",
@@ -27,7 +27,7 @@ const SECTIONS = [
   },
   {
     title: "7. Reklamace a vrácení peněz",
-    body: "Reklamace (např. nedoručené nebo nefunkční vstupenky, chybně stržená částka) zasílejte na hello@asiatakeover.com nebo volejte +420 774 384 616. Reklamaci vyřídíme bez zbytečného odkladu, nejpozději do 30 dnů. Při zrušení akce pořadatelem budou všechny vstupenky plně refundovány na původní platební metodu. Refundované vstupenky jsou zneplatněny a nelze s nimi vstoupit na akci.",
+    body: "Reklamace (např. nedoručené nebo nefunkční vstupenky, chybně stržená částka) zasílejte na hello@asiatakeover.com. Reklamaci vyřídíme bez zbytečného odkladu, nejpozději do 30 dnů. Při zrušení akce pořadatelem budou všechny vstupenky plně refundovány na původní platební metodu. Refundované vstupenky jsou zneplatněny a nelze s nimi vstoupit na akci.",
   },
   {
     title: "8. Vstupní podmínky",
@@ -61,9 +61,10 @@ export default function Terms() {
         <div className="border border-white/10 rounded-2xl bg-[#0D0E15] p-5 mb-10" data-testid="terms-seller-info">
           <p className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-500 mb-2">Prodávající / pořadatel</p>
           <p className="text-sm text-slate-300 leading-relaxed">
+            NGUYEN TRUONG AN<br />
+            Benkova 177/6, Chodov, Praha 11<br />
             IČO: 22156879<br />
             E-mail: hello@asiatakeover.com<br />
-            Telefon: +420 774 384 616<br />
             Místo konání: DUPLEX, Václavské náměstí 831/21, 110 00 Praha 1
           </p>
         </div>
@@ -76,8 +77,7 @@ export default function Terms() {
           ))}
         </div>
         <p className="font-mono2 text-[11px] text-slate-600 mt-12 leading-relaxed" data-testid="terms-legal-note">
-          Pozn.: Před spuštěním prodeje doplň do bodu 1 celé jméno/název a bydliště/sídlo podnikatele (dle IČO v rejstříku)
-          a nech text zkontrolovat právníkem. Platnost od: 27. 8. 2026.
+          Platnost od: 27. 8. 2026.
         </p>
       </main>
     </div>

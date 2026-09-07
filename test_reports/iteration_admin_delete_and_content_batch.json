@@ -1,0 +1,27 @@
+{
+  "summary": "Full regression for owner-requested batch: (1) admin DELETE /api/admin/orders/{id} endpoint + UI, (2) phone number removal, (3) event time 22:00–05:00, (4) FAQ language cleanup (no 'classic DUPLEX'/'klasický DUPLEX'), (5) legal identity (NGUYEN TRUONG AN / Benkova 177/6, Chodov, Praha 11 / IČO 22156879 / hello@asiatakeover.com / asiatakeover.com), (6) new VIP perk list without cloakroom + balloon 🎈, (7) Hero CTA 'GET TICKETS' mobile fit, (8) tickets details removed venue line and 20:00. Backend pytest: 12/12 pass (test_promo.py 8/8 regression + test_admin_delete_order.py 4/4 new). Frontend Playwright covers /faq (EN+CZ), /terms, /privacy, /contact, /tickets, / on 390px mobile viewport, and full admin UI delete flow (create order via public API → login admin → Orders tab → click delete-order-{prefix} → accept confirm → order disappears with success toast).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_admin_delete_order.py",
+    "/app/backend/tests/test_promo.py",
+    "/app/test_reports/pytest/admin_delete_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin_delete_order (server.py:1085) correctly deletes order + tickets + sim_payments in the right sequence and logs the admin email — good audit trail.",
+    "Endpoint returns 404 on double-delete and 401/403 without auth — verified.",
+    "Ticket invalidation after delete verified: scan/lookup returns result='invalid' for previously issued codes (works because find_ticket returns None once tickets are deleted).",
+    "Admin.js:76 uses window.confirm — matches spec; delete button testid pattern is delete-order-{first-8-chars-of-id} as documented.",
+    "Hero.js:102 renders 'Get Tickets' via CSS uppercase (renders as 'GET TICKETS'); measured 180×54px on 390px viewport — single line, no wrap.",
+    "Tickets.js:346–378 hard-codes exactly the 4 standard perks and 7 VIP perks per spec; balloon emoji 🎈 present."
+  ],
+  "updated_files": ["/app/backend/tests/test_admin_delete_order.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin: admin@asiatakeover.eu / Takeover2026! (from /app/memory/test_credentials.md). Lockdown bypass via localStorage atf_unlocked=1 + atf_unlocked_at=Date.now().",
+  "seed_data_creation": "Test used public POST /api/orders/create with promo_code ATFTEST95 to create disposable order; deleted via new admin endpoint in the same test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Delete order testid pattern: [data-testid=\"delete-order-{first8chars}\"]. Admin login form uses standard email/password inputs and a 'Sign in' button. Confirm dialog is native window.confirm — use page.on('dialog', lambda d: d.accept()). After deletion Admin shows green toast 'Order deleted (N tickets removed)'. All content strings for phone/20:00/cloakroom/classic-DUPLEX confirmed absent site-wide.",
+  "rca of the issue": "N/A — all owner-requested changes implemented correctly and verified."
+}
