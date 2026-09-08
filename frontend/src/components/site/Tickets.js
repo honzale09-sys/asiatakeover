@@ -283,10 +283,13 @@ export default function Tickets({ tiers = [], event }) {
   const [selected, setSelected] = useState(null);
   const isAvailable = (t) => (t.sold || 0) < t.capacity;
   const ga = [...tiers].filter((t) => !t.name.toUpperCase().includes("VIP")).sort((a, b) => a.price_czk - b.price_czk);
-  const vip = [...tiers].filter((t) => t.name.toUpperCase().includes("VIP")).sort((a, b) => a.price_czk - b.price_czk)[0];
+  const vipTiers = [...tiers].filter((t) => t.name.toUpperCase().includes("VIP")).sort((a, b) => a.price_czk - b.price_czk);
   const soldOutGA = ga.filter((t) => !isAvailable(t));
   const activeGA = ga.find(isAvailable);
   const nextGA = activeGA ? ga[ga.indexOf(activeGA) + 1] : null;
+  const soldOutVip = vipTiers.filter((t) => !isAvailable(t));
+  const vip = vipTiers.find(isAvailable) || vipTiers[vipTiers.length - 1];
+  const nextVip = vip && isAvailable(vip) ? vipTiers[vipTiers.indexOf(vip) + 1] : null;
   const vipOut = vip ? !isAvailable(vip) : false;
 
   return (
@@ -374,6 +377,18 @@ export default function Tickets({ tiers = [], event }) {
               </div>
             )}
 
+            {soldOutVip.map((t) => (
+              <div
+                key={t.id}
+                data-testid={`soldout-row-${t.id}`}
+                className="flex items-center justify-between border border-white/5 bg-white/[0.02] rounded-lg px-4 py-2.5 mb-2 opacity-45"
+              >
+                <span className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#C9A227]">VIP Table Ticket</span>
+                <span className="font-mono2 text-xs text-slate-500">{czk(t.price_czk)}</span>
+                <span className="font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 border border-white/10 rounded-full px-3 py-1">Sold out</span>
+              </div>
+            ))}
+
             {vip && (
               <div
                 data-testid={`ticket-tier-card-${vip.id}`}
@@ -383,7 +398,9 @@ export default function Tickets({ tiers = [], event }) {
               >
                 <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227] mb-3">VIP Table Ticket</p>
                 <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="vip-price">{czk(vip.price_czk)}</p>
-                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500 mb-5">Limited capacity</p>
+                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500 mb-5">
+                  {vipOut ? "Sold out" : nextVip ? `Limited capacity · Next release: ${czk(nextVip.price_czk)}` : "Limited capacity"}
+                </p>
                 <ul className="text-left space-y-2.5 text-sm text-slate-300 mb-6" data-testid="vip-card-perks-list">
                   {[
                     "Access to all 3 stages",
