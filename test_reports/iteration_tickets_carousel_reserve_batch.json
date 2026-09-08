@@ -1,0 +1,45 @@
+{
+  "summary": "Full end-to-end validation of the Tickets/Reserve/Phone/Carousel batch. Backend (9/9 pytest) and Frontend (desktop+mobile) all pass. Order phone is now required (422 on missing/short), buyer_phone is persisted, /api/reservations stores messages with topic 'VIP Table Reservation' and phone/guests/floor, /tickets 3-poster carousel + dots + mobile hint working, VIP list has 3 checks + 7 trophy items with exact copy, standard list has 3 checks + 3 red X + upsell note, FAQ EN/CZ content matches spec, Teya payment step still mounts after phone field addition.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_results": {
+    "GET /api/site": "200",
+    "GET /api/promo/validate?code=ATFTEST95": "{valid:false} (regression OK)",
+    "POST /api/orders/create no phone": "422",
+    "POST /api/orders/create short phone (len<6)": "422",
+    "POST /api/orders/create with phone": "200 + buyer_phone persisted in Mongo (verified '+420777999888')",
+    "POST /api/reservations valid": "200, message written to db with topic 'VIP Table Reservation', phone/guests/floor fields present in admin GET /api/admin/messages",
+    "POST /api/reservations missing fields": "422",
+    "POST /api/reservations guests=0": "422",
+    "POST /api/auth/login admin + GET /auth/me": "200",
+    "/tickets carousel": "poster-slide-1/2/3 present with festival/floors/lineup images; poster-dots x3; dot-2 click scrolls (scrollLeft 382)",
+    "poster-swipe-hint": "display:none on desktop (1920), display:block on mobile (390)",
+    "Standard perks list": "3 green Check items + 3 red X items + standard-vip-note upsell text",
+    "vip-perks-list": "10 items — first 3 with green Check, last 7 with 🏆; copy matches spec incl. 'Surprise gift ❤️‍🔥🎈 (value 200 Kč)' and 'Hostess service with your table reservation'",
+    "reserve-table-button": "navigates from /tickets to /reserve",
+    "/reserve form": "HTML5 required blocks empty submit; filled submit shows reserve-success block",
+    "Checkout modal phone required": "phone input has required attr; validity.valid=False when empty; form stays on step='form'",
+    "Checkout modal Teya mount": "after filling name/email/phone/submit → teya-embedded-checkout appears and teya-checkout-container becomes visible (Teya SDK loaded — NOT paid)",
+    "Mobile 390 /tickets overflow": "0px horizontal overflow, carousel snap OK, swipe hint visible",
+    "Mobile 390 /reserve overflow": "0px",
+    "FAQ EN": "standard mentions 'Not included: VIP table areas', 'reserved tables or guaranteed seating', 'bottle service'; VIP mentions surprise gift 200 Kč, hostess service, VIP balcony 7th floor, priority entry, VIP toilets",
+    "FAQ CZ (toggle button)": "contains 'VIP stoly', 'překvapení', 'hosteska', 'VIP balkón v 7', 'přednostní vstup', 'VIP toalety', 'bottle service'"
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_tickets_batch.py",
+    "/app/test_reports/pytest/tickets_batch.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Non-blocking: /admin/orders excludes 'created' & 'pending' orders (server.py line ~1106); this is intentional to hide abandoned Teya sessions but means the buyer_phone verification via admin UI is only visible AFTER payment. Verified via direct DB read that buyer_phone is stored on unpaid orders too."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_tickets_batch.py (new)"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100%"},
+  "test_credentials": "admin@asiatakeover.eu / Takeover2026! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created one TEST reservation via /api/reservations (topic 'VIP Table Reservation') and one unpaid TEST order that was then cleaned up via DELETE /api/admin/orders/{id}. One additional UI-driven reservation ('TEST UI …') also persisted — can be cleaned by admin if desired.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Site is LIVE-public. Teya is LIVE — do NOT complete payments (fill form + click Continue is safe; the SDK just mounts). Preview URL: https://asia-takeover-fest.preview.emergentagent.com. Backend regression suite in /app/backend/tests/test_tickets_batch.py covers site/promo/orders-phone/reservations/admin-auth."
+}

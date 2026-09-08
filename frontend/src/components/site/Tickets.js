@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { Check, X } from "lucide-react";
@@ -9,11 +10,64 @@ import { Reveal } from "./Reveal";
 const inputCls =
   "w-full bg-[#0D0E15] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:border-[#FF0055] outline-none transition-colors";
 
+const POSTERS = [
+  { src: "/assets/poster-festival.jpg", alt: "ASIA TAKEOVER FESTIVAL — official poster" },
+  { src: "/assets/poster-floors.jpg", alt: "Floor map — KPOP Room, Mainstream Room, Saigon Room" },
+  { src: "/assets/poster-lineup.jpg", alt: "Full line up — all 3 stages" },
+];
+
+function PosterCarousel() {
+  const ref = useRef(null);
+  const [idx, setIdx] = useState(0);
+  const onScroll = () => {
+    const el = ref.current;
+    if (el) setIdx(Math.round(el.scrollLeft / el.clientWidth));
+  };
+  const go = (i) => ref.current?.scrollTo({ left: i * ref.current.clientWidth, behavior: "smooth" });
+  return (
+    <div className="lg:sticky lg:top-8">
+      <div
+        ref={ref}
+        onScroll={onScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory rounded-2xl border border-white/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-w-sm mx-auto cursor-grab active:cursor-grabbing"
+        data-testid="poster-carousel"
+      >
+        {POSTERS.map((p, i) => (
+          <img
+            key={p.src}
+            src={p.src}
+            alt={p.alt}
+            draggable={false}
+            loading={i === 0 ? "eager" : "lazy"}
+            className="w-full shrink-0 snap-center aspect-[4/5] object-cover select-none"
+            data-testid={`poster-slide-${i + 1}`}
+          />
+        ))}
+      </div>
+      <div className="flex items-center justify-center gap-2.5 mt-4" data-testid="poster-dots">
+        {POSTERS.map((p, i) => (
+          <button
+            key={p.src}
+            onClick={() => go(i)}
+            aria-label={`Poster ${i + 1}`}
+            data-testid={`poster-dot-${i + 1}`}
+            className={`h-1.5 rounded-full transition-all duration-300 ${i === idx ? "w-7 bg-[#FF0055]" : "w-1.5 bg-white/25 hover:bg-white/50"}`}
+          />
+        ))}
+      </div>
+      <p className="font-mono2 text-[10px] uppercase tracking-[0.3em] text-white/35 text-center mt-3 animate-pulse sm:hidden" data-testid="poster-swipe-hint">
+        Swipe for more →
+      </p>
+    </div>
+  );
+}
+
 function CheckoutModal({ tier, event, onClose }) {
   const displayName = /vip/i.test(tier.name) ? "VIP Table Ticket" : "Standard Ticket";
   const [step, setStep] = useState("form");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [qty, setQty] = useState(1);
   const [payment, setPayment] = useState(null);
   const [promoInput, setPromoInput] = useState("");
@@ -86,6 +140,7 @@ function CheckoutModal({ tier, event, onClose }) {
         quantity: qty,
         name,
         email,
+        phone,
         promo_code: promoApplied ? promoApplied.code : undefined,
         attribution: buildOrderAttribution(),
         marketing_consent: marketingAllowed(),
@@ -129,6 +184,10 @@ function CheckoutModal({ tier, event, onClose }) {
               <div>
                 <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">Email</label>
                 <input data-testid="checkout-email-input" required type="email" className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" />
+              </div>
+              <div>
+                <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">Phone</label>
+                <input data-testid="checkout-phone-input" required type="tel" className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+420 …" />
               </div>
               <div>
                 <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">Quantity</label>
@@ -230,12 +289,7 @@ export default function Tickets({ tiers = [], event }) {
     <section id="tickets" className="px-4 sm:px-8 lg:px-16 py-12 lg:py-20" data-testid="tickets-section">
       <div className="grid gap-10 lg:grid-cols-[1fr_minmax(0,400px)_1fr] lg:gap-12 items-start" data-testid="ticket-tiers">
         <Reveal className="lg:order-2">
-          <img
-            src="/assets/poster-festival.jpg"
-            alt={`${event?.name || "ASIA TAKEOVER FESTIVAL"} — 27.09.2026, DUPLEX Prague`}
-            className="w-full max-w-sm mx-auto rounded-2xl border border-white/10 lg:sticky lg:top-8"
-            data-testid="tickets-event-poster"
-          />
+          <PosterCarousel />
         </Reveal>
 
         <Reveal delay={0.05} className="lg:order-3">
@@ -263,7 +317,7 @@ export default function Tickets({ tiers = [], event }) {
             {activeGA ? (
               <div
                 data-testid={`ticket-tier-card-${activeGA.id}`}
-                className="border border-white/10 bg-[#0D0E15] rounded-3xl p-6 sm:p-8 hover:border-[#FF0055]/60 transition-colors duration-300"
+                className="border border-white/10 bg-[#0D0E15] rounded-3xl p-6 sm:p-8 hover:border-[#FF0055]/60 hover:-translate-y-1 transition-all duration-300"
               >
                 <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">Standard Ticket</p>
                 <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="ga-price">{czk(activeGA.price_czk)}</p>
@@ -273,7 +327,7 @@ export default function Tickets({ tiers = [], event }) {
                 <button
                   data-testid={`buy-ticket-button-${activeGA.id}`}
                   onClick={() => setSelected(activeGA)}
-                  className="w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-base py-4 rounded-full transition-colors duration-300 min-h-[56px]"
+                  className="w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-base py-4 rounded-full transition-all duration-200 hover:shadow-[0_0_35px_rgba(255,106,0,0.35)] active:scale-[0.97] min-h-[56px]"
                 >
                   Buy Ticket
                 </button>
@@ -303,8 +357,8 @@ export default function Tickets({ tiers = [], event }) {
             {vip && (
               <div
                 data-testid={`ticket-tier-card-${vip.id}`}
-                className={`mt-5 border rounded-3xl p-6 sm:p-8 transition-colors duration-300 ${
-                  vipOut ? "border-white/10 bg-[#0D0E15] opacity-50" : "border-white/10 bg-[#0D0E15] hover:border-[#FF0055]/60"
+                className={`mt-5 border rounded-3xl p-6 sm:p-8 transition-all duration-300 ${
+                  vipOut ? "border-white/10 bg-[#0D0E15] opacity-50" : "border-white/10 bg-[#0D0E15] hover:border-[#FF0055]/60 hover:-translate-y-1"
                 }`}
               >
                 <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227] mb-3">VIP Table Ticket</p>
@@ -317,11 +371,18 @@ export default function Tickets({ tiers = [], event }) {
                   className={`w-full font-display font-bold uppercase text-base py-4 rounded-full transition-colors duration-300 min-h-[56px] ${
                     vipOut
                       ? "bg-white/5 text-slate-600 cursor-not-allowed"
-                      : "bg-[#FF6A00] hover:bg-[#FF8534] text-white"
+                      : "bg-[#FF6A00] hover:bg-[#FF8534] text-white active:scale-[0.97] transition-all"
                   }`}
                 >
                   {vipOut ? "Sold Out" : "Buy Ticket"}
                 </button>
+                <Link
+                  to="/reserve"
+                  data-testid="reserve-table-button"
+                  className="mt-3 w-full inline-flex items-center justify-center border border-[#C9A227] text-[#C9A227] hover:bg-[#C9A227] hover:text-black font-display font-bold uppercase text-sm py-3.5 rounded-full transition-all duration-200 active:scale-[0.97]"
+                >
+                  Reserve a Table
+                </Link>
               </div>
             )}
           </div>
@@ -344,13 +405,15 @@ export default function Tickets({ tiers = [], event }) {
                   <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {d}
                 </li>
               ))}
-              <li className="flex items-start gap-2.5">
-                <X size={15} className="text-[#FF0055] mt-0.5 shrink-0" /> No access to VIP areas
-              </li>
-              <li className="flex items-start gap-2.5">
-                <X size={15} className="text-[#FF0055] mt-0.5 shrink-0" /> No bottle service
-              </li>
+              {["No access to VIP table areas", "No reserved table or guaranteed seating", "No bottle service"].map((d) => (
+                <li key={d} className="flex items-start gap-2.5">
+                  <X size={15} className="text-[#FF0055] mt-0.5 shrink-0" /> {d}
+                </li>
+              ))}
             </ul>
+            <p className="text-sm text-slate-400 mt-5 leading-relaxed" data-testid="standard-vip-note">
+              Want to book a table with bottle service? A <span className="text-[#C9A227]">VIP Table Ticket</span> is required.
+            </p>
             <p className="font-mono2 text-[10px] uppercase tracking-[0.15em] text-slate-600 mt-6 leading-relaxed" data-testid="ticket-no-refund-note">
               Tickets are non-refundable · full refund only if the event is cancelled by the organizer
             </p>
@@ -362,13 +425,19 @@ export default function Tickets({ tiers = [], event }) {
                     "Access to all 3 stages",
                     "Standing and dance floor access",
                     "Access to all public bars and rooftops",
-                    "VIP areas access",
-                    "Bottle service with hostess access",
-                    "Priority lane",
-                    "VIP treatment",
-                    "Surprise gift ❤️‍🔥🎈",
-                    "Balcony in 7th floor K-POP stage access",
-                    "VIP toilets access",
+                  ].map((p) => (
+                    <li key={p} className="flex items-start gap-2.5">
+                      <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {p}
+                    </li>
+                  ))}
+                  {[
+                    "Surprise gift ❤️‍🔥🎈 (value 200 Kč)",
+                    "Access to all VIP table areas",
+                    "Ability to reserve a VIP table with bottle service",
+                    "Hostess service with your table reservation",
+                    "Access to the VIP balcony on the 7th floor",
+                    "Priority entry",
+                    "VIP toilets",
                   ].map((p) => (
                     <li key={p} className="flex items-start gap-2.5">
                       <span className="mt-0.5 shrink-0 text-sm leading-none">🏆</span> {p}

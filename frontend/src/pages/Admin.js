@@ -138,6 +138,7 @@ function OrdersTab() {
                 <td className="px-4 py-3">
                   <p className="font-medium">{o.buyer_name}</p>
                   <p className="font-mono2 text-xs text-slate-500">{o.buyer_email}</p>
+                  {o.buyer_phone && <p className="font-mono2 text-xs text-slate-500" data-testid={`order-phone-${o.id.slice(0, 8)}`}>{o.buyer_phone}</p>}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap" data-testid={`order-category-${o.id.slice(0, 8)}`}>
                   <span className={`font-mono2 text-[10px] uppercase tracking-[0.15em] px-2.5 py-1 rounded-full border ${
@@ -542,7 +543,15 @@ function MessagesTab() {
             <span className="font-mono2 text-[11px] text-[#00F0FF] border border-[#00F0FF]/30 rounded-full px-2.5 py-0.5">{m.topic}</span>
             <span className="font-mono2 text-[11px] text-slate-500">{new Date(m.created_at).toLocaleString("cs-CZ")}</span>
           </div>
-          <p className="font-mono2 text-xs text-slate-400 mb-2">{m.email}</p>
+          <p className="font-mono2 text-xs text-slate-400 mb-2">
+            {m.email}
+            {m.phone && <span className="text-slate-500"> · {m.phone}</span>}
+          </p>
+          {(m.guests || m.floor) && (
+            <p className="font-mono2 text-xs text-[#C9A227] mb-2" data-testid={`message-meta-${m.id.slice(0, 8)}`}>
+              {m.guests && `${m.guests} guests`}{m.guests && m.floor && " · "}{m.floor}
+            </p>
+          )}
           <p className="text-sm text-slate-300 leading-relaxed">{m.message}</p>
         </div>
       ))}

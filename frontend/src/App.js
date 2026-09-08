@@ -9,6 +9,7 @@ import Terms from "@/pages/Terms";
 import ContactPage from "@/pages/ContactPage";
 import FaqPage from "@/pages/FaqPage";
 import GalleryPage from "@/pages/GalleryPage";
+import ReservePage from "@/pages/ReservePage";
 import PrivacyPage from "@/pages/PrivacyPage";
 import Admin from "@/pages/Admin";
 import Scanner from "@/pages/Scanner";
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/contact" element={<Lockdown><ContactPage /></Lockdown>} />
         <Route path="/faq" element={<Lockdown><FaqPage /></Lockdown>} />
         <Route path="/gallery" element={<Lockdown><GalleryPage /></Lockdown>} />
+        <Route path="/reserve" element={<Lockdown><ReservePage /></Lockdown>} />
         <Route path="/privacy" element={<Lockdown><PrivacyPage /></Lockdown>} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/nascanujtobrasko" element={<Scanner />} />

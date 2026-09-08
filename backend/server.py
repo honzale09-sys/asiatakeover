@@ -185,6 +185,7 @@ class OrderCreateIn(BaseModel):
     quantity: int = Field(ge=1, le=10)
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
+    phone: str = Field(min_length=6, max_length=30)
     attribution: Optional[AttributionIn] = None
     marketing_consent: bool = False
     promo_code: Optional[str] = None
@@ -779,6 +780,7 @@ async def create_order(data: OrderCreateIn, request: Request):
         "currency": "CZK",
         "buyer_name": data.name,
         "buyer_email": data.email.lower(),
+        "buyer_phone": data.phone.strip(),
         "payment_status": "created",
         "gopay_payment_id": None,
         "paid_at": None,
@@ -993,6 +995,23 @@ async def contact(data: ContactIn):
     await db.messages.insert_one(doc)
     doc.pop("_id", None)
     return doc
+
+
+class ReservationIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    phone: str = Field(min_length=6, max_length=30)
+    email: EmailStr
+    guests: int = Field(ge=1, le=30)
+    floor: str = Field(min_length=1, max_length=60)
+    message: str = Field(default="", max_length=4000)
+
+
+@api_router.post("/reservations")
+async def create_reservation(data: ReservationIn):
+    doc = {"id": new_id(), "topic": "VIP Table Reservation", **data.model_dump(), "created_at": utcnow().isoformat()}
+    await db.messages.insert_one(doc)
+    doc.pop("_id", None)
+    return {"ok": True, "id": doc["id"]}
 
 
 # ---------------- scanner (door staff) ----------------
