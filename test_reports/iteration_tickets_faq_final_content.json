@@ -1,0 +1,20 @@
+{
+  "summary": "Frontend content verification on /tickets and /faq passed for the final owner-approved copy. Standard Ticket list shows 3 green (text-green-400) checkmark items + exactly 2 red-X items ('No access to VIP areas', 'No bottle service'); no blue/cyan Check icons remain. VIP Table Ticket list has exactly 10 items each prefixed with a single 🏆 trophy including 'Surprise gift ❤️‍🔥🎈'. FAQ EN and CZ both fully describe Standard and VIP Table Ticket contents per spec. Buy cards still read 'Standard Ticket' 499 Kč and 'VIP Table Ticket' 799 Kč, promo ATFTEST95 applies with 95% off. No application-level console errors on /tickets or /faq.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Console shows a React hydration warning ('<span> cannot be a child of <option>') on the checkout modal's quantity <select>. The offending <span> is injected by the Emergent dev-tools instrumentation (x-source-editable/x-ve-dynamic wrappers around option text). This is an Emergent tooling artifact, not user-visible in production, but if it appears in prod builds too it should be filtered out for <option>/<select> children."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "seed_data_creation": "",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Content batch verified: Tickets.js standard list uses text-green-400 Check icons + 2 red X items; VIP list has exactly 10 items with 🏆 prefix. FAQ EN/CZ (FaqPage.js) both cover Standard/VIP Table Ticket contents. Promo ATFTEST95 still works via /api/promo/validate. Only console noise is the Emergent devtool-injected <span> in <option> which produces a hydration warning on the checkout modal quantity select."
+}

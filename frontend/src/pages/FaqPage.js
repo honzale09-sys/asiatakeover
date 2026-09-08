@@ -5,8 +5,8 @@ const FAQS = {
   en: [
     { q: "Is there an age limit?", a: "Yes — the event is strictly 18+. Bring a valid ID or passport; every QR code is scanned and IDs are checked at the entrance." },
     { q: "When does the event start and when does it end?", a: "The festival runs from 22:00 to 05:00 on 27.09.2026." },
-    { q: "What does the Standard Ticket include?", a: "Access to all three stages: Seoul Floor (7th floor, powered by SeoulVibes), Mainstream Floor (6th floor) and Saigon Floor (5th floor, powered by GANGSHII) — plus standing and dance floor access and all public bars. VIP areas are not included." },
-    { q: "What does the VIP Table Ticket include?", a: "Access to all 3 stages, priority fast lane entry, access to all VIP areas, VIP toilets, a special gift, bottle service available, and 7th floor K-POP stage balcony access with tables." },
+    { q: "What does the Standard Ticket include?", a: "Access to all 3 stages (Seoul Floor, Mainstream Floor, Saigon Floor), standing and dance floor access, and access to all public bars and rooftops. Not included: VIP areas and bottle service — those are exclusive to the VIP Table Ticket." },
+    { q: "What does the VIP Table Ticket include?", a: "Everything from the Standard Ticket — all 3 stages, standing and dance floor access, all public bars and rooftops — plus: VIP areas access, bottle service with hostess, priority lane entry, VIP treatment, a surprise gift, balcony access at the 7th floor K-POP stage, and VIP toilets access." },
     { q: "Where exactly is DUPLEX?", a: "DUPLEX Prague, Václavské náměstí 831/21, 110 00 Praha 1 — on top of the building on Wenceslas Square. Metro Můstek is 2 minutes away." },
     { q: "Can I get a refund or transfer my ticket?", a: "Tickets are non-refundable. You can freely transfer your ticket to someone else — only the QR code is validated at the door, never the name. If the event is cancelled by the organizer, all tickets are fully refunded automatically." },
     { q: "I paid but didn't receive my tickets. What now?", a: "Check your spam folder first. If nothing arrived, email hello@asiatakeover.com and we'll resend your tickets." },
@@ -14,8 +14,8 @@ const FAQS = {
   cz: [
     { q: "Je na akci věkový limit?", a: "Ano — akce je přísně 18+. Vezmi si platný občanský průkaz nebo pas; každý QR kód se skenuje a u vstupu kontrolujeme doklady." },
     { q: "Kdy akce začíná a kdy končí?", a: "Festival probíhá od 22:00 do 05:00 dne 27. 9. 2026." },
-    { q: "Co obsahuje Standard Ticket?", a: "Vstup na všechny tři stage: Seoul Floor (7. patro, powered by SeoulVibes), Mainstream Floor (6. patro) a Saigon Floor (5. patro, powered by GANGSHII) — plus vstup na taneční parket a ke všem veřejným barům. VIP zóny nejsou součástí." },
-    { q: "Co obsahuje VIP Table Ticket?", a: "Vstup na všechny 3 stage, přednostní rychlý vstup, přístup do všech VIP zón, VIP toalety, speciální dárek, možnost bottle service a přístup na balkón se stoly u K-POP stage v 7. patře." },
+    { q: "Co obsahuje Standard Ticket?", a: "Vstup na všechny 3 stage (Seoul Floor, Mainstream Floor, Saigon Floor), vstup na taneční parket a přístup ke všem veřejným barům a rooftopům. Nezahrnuje: VIP zóny a bottle service — ty jsou výhradně pro VIP Table Ticket." },
+    { q: "Co obsahuje VIP Table Ticket?", a: "Všechno ze Standard Ticketu — všechny 3 stage, taneční parket, všechny veřejné bary a rooftopy — navíc: přístup do VIP zón, bottle service s hosteskou, přednostní rychlý vstup (priority lane), VIP treatment, překvapení jako dárek, přístup na balkón u K-POP stage v 7. patře a VIP toalety." },
     { q: "Kde přesně je DUPLEX?", a: "DUPLEX Prague, Václavské náměstí 831/21, 110 00 Praha 1 — na střeše budovy na Václavském náměstí. Metro Můstek je 2 minuty pěšky." },
     { q: "Můžu vrátit nebo převést vstupenku?", a: "Vstupenky se nevrací (no refund). Vstupenku ale můžeš volně převést na někoho jiného — u dveří se ověřuje pouze QR kód, nikdy ne jméno. Pokud akci zruší pořadatel, všem automaticky vracíme plnou částku." },
     { q: "Zaplatil/a jsem, ale vstupenky mi nepřišly. Co teď?", a: "Nejdřív zkontroluj složku Spam. Pokud nic nedorazilo, napiš na hello@asiatakeover.com a vstupenky ti obratem přepošleme." },

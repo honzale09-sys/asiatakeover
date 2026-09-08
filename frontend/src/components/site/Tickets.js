@@ -344,17 +344,23 @@ export default function Tickets({ tiers = [], event }) {
             <h2 className="font-display text-xl sm:text-2xl font-extrabold uppercase tracking-tight mb-6">
               What your ticket <span className="text-[#FF0055]">includes</span>
             </h2>
+            <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-4" data-testid="standard-perks-label">Standard Ticket</p>
             <ul className="space-y-3 text-sm text-slate-300">
               {[
                 "Access to all 3 stages",
                 "Standing and dance floor access",
-                "Access to all public bars",
-                "No access to VIP areas",
+                "Access to all public bars and rooftops",
               ].map((d) => (
                 <li key={d} className="flex items-start gap-2.5">
-                  <Check size={15} className="text-[#00F0FF] mt-0.5 shrink-0" /> {d}
+                  <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {d}
                 </li>
               ))}
+              <li className="flex items-start gap-2.5">
+                <X size={15} className="text-[#FF0055] mt-0.5 shrink-0" /> No access to VIP areas
+              </li>
+              <li className="flex items-start gap-2.5">
+                <X size={15} className="text-[#FF0055] mt-0.5 shrink-0" /> No bottle service
+              </li>
             </ul>
             <p className="font-mono2 text-[10px] uppercase tracking-[0.15em] text-slate-600 mt-6 leading-relaxed" data-testid="ticket-no-refund-note">
               Tickets are non-refundable · full refund only if the event is cancelled by the organizer
@@ -365,15 +371,18 @@ export default function Tickets({ tiers = [], event }) {
                 <ul className="space-y-2.5 text-sm text-slate-300" data-testid="vip-perks-list">
                   {[
                     "Access to all 3 stages",
-                    "Priority fast lane",
-                    "Access to all VIP areas",
-                    "VIP Toilets",
-                    "Special Gift 🎈",
-                    "Bottle service available",
-                    "7th floor K-POP stage balcony access with tables",
+                    "Standing and dance floor access",
+                    "Access to all public bars and rooftops",
+                    "VIP areas access",
+                    "Bottle service with hostess access",
+                    "Priority lane",
+                    "VIP treatment",
+                    "Surprise gift ❤️‍🔥🎈",
+                    "Balcony in 7th floor K-POP stage access",
+                    "VIP toilets access",
                   ].map((p) => (
                     <li key={p} className="flex items-start gap-2.5">
-                      <Check size={15} className="text-[#C9A227] mt-0.5 shrink-0" /> {p}
+                      <span className="mt-0.5 shrink-0 text-sm leading-none">🏆</span> {p}
                     </li>
                   ))}
                 </ul>
