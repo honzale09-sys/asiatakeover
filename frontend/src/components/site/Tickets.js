@@ -371,7 +371,7 @@ export default function Tickets({ tiers = [], event }) {
                     "VIP toilets access",
                   ].map((p) => (
                     <li key={p} className="flex items-start gap-2.5">
-                      <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {p}
+                      <span className="mt-0.5 shrink-0 text-sm leading-none">🏆</span> {p}
                     </li>
                   ))}
                 </ul>
