@@ -1167,6 +1167,64 @@ async def admin_stats(admin=Depends(get_current_admin)):
             "checked_in": checked_in, "per_tier": per_tier, "recent_scans": recent_scans}
 
 
+class CompTicketIn(BaseModel):
+    quantity: int = Field(default=1, ge=1, le=10)
+    holder_name: str = Field(default="Guest", max_length=120)
+    category: str = "standard"  # "standard" | "vip"
+
+
+@api_router.post("/admin/comp-tickets")
+async def admin_comp_tickets(data: CompTicketIn, admin=Depends(get_current_admin)):
+    """Issue free (comp) tickets manually — e.g. for guests/partners. No payment, no email."""
+    event = await db.events.find_one({"active": True}, {"_id": 0})
+    if not event:
+        raise HTTPException(404, "No active event")
+    want_vip = data.category.strip().lower() == "vip"
+    tiers = await db.ticket_tiers.find({"event_id": event["id"]}).to_list(100)
+    tiers = [t for t in tiers if ("VIP" in t["name"].upper()) == want_vip]
+    tiers.sort(key=lambda t: t["price_czk"])
+    tier = None
+    for t in tiers:
+        if await db.tickets.count_documents({"tier_id": t["id"]}) < t["capacity"]:
+            tier = t
+            break
+    if not tier:
+        raise HTTPException(400, "No capacity left in this ticket category")
+    now = utcnow().isoformat()
+    order = {
+        "id": new_id(), "created_at": now, "updated_at": now,
+        "event_id": event["id"], "event_name": event["name"],
+        "tier_id": tier["id"], "tier_name": ticket_display_name(tier["name"]),
+        "quantity": data.quantity, "amount_czk": 0, "list_price_czk": 0,
+        "unit_price_czk": 0, "promo_code": None, "discount_percent": None,
+        "currency": "CZK", "buyer_name": data.holder_name.strip() or "Guest",
+        "buyer_email": "", "buyer_phone": "",
+        "payment_status": "paid", "paid_at": now, "fulfillment_status": "fulfilled",
+        "comp": True, "created_by": admin.get("email"),
+        "marketing_consent": False, "attribution": None, "gopay_payment_id": None,
+    }
+    await db.orders.insert_one(order)
+    tickets = []
+    for _ in range(data.quantity):
+        code = "ATF-" + secrets.token_hex(3).upper()
+        t = {
+            "id": new_id(), "code": code, "order_id": order["id"],
+            "event_id": event["id"], "event_name": event["name"],
+            "tier_id": tier["id"], "tier_name": order["tier_name"],
+            "holder_name": order["buyer_name"], "buyer_email": "",
+            "status": "valid", "created_at": now,
+            "checked_in_at": None, "checked_in_by": None,
+        }
+        await db.tickets.insert_one(t)
+        tickets.append(t)
+    logger.warning("ADMIN %s issued %d comp ticket(s), tier %s", admin.get("email"), data.quantity, tier["name"])
+    return {
+        "ok": True, "order_id": order["id"], "tier_name": order["tier_name"],
+        "tickets": [{"code": t["code"], "qr_url": f"{SITE_URL}/api/qr/{t['code']}.png",
+                      "link": f"{SITE_URL}/success?order_id={order['id']}"} for t in tickets],
+    }
+
+
 @api_router.get("/admin/orders")
 async def admin_orders(admin=Depends(get_current_admin)):
     orders = await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(10000)
