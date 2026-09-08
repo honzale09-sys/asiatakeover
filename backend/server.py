@@ -1320,7 +1320,7 @@ async def startup():
     await db.promo_codes.create_index("code", unique=True)
     await db.promo_codes.update_one(
         {"code": "ATFTEST95"},
-        {"$setOnInsert": {"code": "ATFTEST95", "percent_off": 95, "active": True}},
+        {"$set": {"active": False}, "$setOnInsert": {"code": "ATFTEST95", "percent_off": 95}},
         upsert=True,
     )
     await seed_admin()

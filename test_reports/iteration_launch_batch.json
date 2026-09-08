@@ -1,0 +1,39 @@
+{
+  "summary": "LAUNCH batch validation: lockdown disabled, unified ticket cards (Standard & VIP identical dimensions/classes), VIP perks list (10 green checks, no trophies), promo ATFTEST95 deactivated end-to-end. All backend + frontend acceptance criteria met.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "GET /api/gate/status": "enabled=false ✓",
+    "GET /api/promo/validate?code=ATFTEST95": "{valid:false} ✓",
+    "POST /api/orders/create with promo ATFTEST95": "HTTP 400 'Invalid discount code' ✓",
+    "GET /api/site": "200 ✓",
+    "POST /api/auth/login (admin)": "200 + cookie ✓",
+    "GET /api/admin/orders": "200, order rows present ✓",
+    "Frontend home (fresh context)": "hero renders, no lockdown page ✓",
+    "Public routes /tickets /gallery /faq /terms /contact": "all 200, no lockdown ✓",
+    "Ticket cards": "Both cards width=448, class shares 'border border-white/10 bg-[#0D0E15] rounded-3xl p-6 sm:p-8 hover:border-[#FF0055]/60' ✓",
+    "Price sizes": "ga-price and vip-price both 'font-display font-black text-4xl sm:text-5xl mb-4' — identical ✓",
+    "Buy buttons": "Both 'w-full bg-[#FF6A00] hover:bg-[#FF8534] ... rounded-full min-h-[56px]' — no gold outlined VIP button ✓",
+    "'Selling now' badge": "not present in DOM ✓",
+    "Standard 'next-release' note + price-progression": "present below Buy Ticket, unique to Standard ✓",
+    "VIP perks list": "10 items, 10 green (lucide) check icons, no 🏆 trophy emoji ✓",
+    "Standard perks list": "3 items with green Check + 2 with red X (per source review) ✓",
+    "Promo modal flow": "typing ATFTEST95 + Apply → toast contains 'Invalid discount code', no promo-applied-note rendered, price stays full ✓"
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Non-blocking: React hydration warning 'span cannot be a child of <option>' inside checkout quantity select — caused by ve-dynamic instrumentation wrapping option children. Consider stripping instrumentation on option nodes or moving quantity to a custom listbox to silence the warning."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "test_credentials": "admin@asiatakeover.eu / Takeover2026! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None. Verified against existing seeded tiers and orders.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Site is LIVE-public (lockdown off). Promo ATFTEST95 is deactivated at DB seed level (active:false via $set) — validated on preview backend. Preview URL: https://asia-takeover-fest.preview.emergentagent.com. Teya is LIVE — never submit card fields; test modal up to promo/toast only."
+}

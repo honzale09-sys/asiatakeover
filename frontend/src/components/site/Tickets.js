@@ -263,11 +263,8 @@ export default function Tickets({ tiers = [], event }) {
             {activeGA ? (
               <div
                 data-testid={`ticket-tier-card-${activeGA.id}`}
-                className="relative border border-[#FF0055]/50 bg-[#0D0E15] rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(255,0,85,0.18)] hover:shadow-[0_0_70px_rgba(255,0,85,0.28)] hover:border-[#FF0055]/80 transition-all duration-300"
+                className="border border-white/10 bg-[#0D0E15] rounded-3xl p-6 sm:p-8 hover:border-[#FF0055]/60 transition-colors duration-300"
               >
-                <span className="absolute -top-3 left-6 bg-[#FF0055] font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full" data-testid="most-popular-badge">
-                  Selling now
-                </span>
                 <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">Standard Ticket</p>
                 <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="ga-price">{czk(activeGA.price_czk)}</p>
                 <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600] mb-6" data-testid="next-release">
@@ -276,7 +273,7 @@ export default function Tickets({ tiers = [], event }) {
                 <button
                   data-testid={`buy-ticket-button-${activeGA.id}`}
                   onClick={() => setSelected(activeGA)}
-                  className="w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-base py-4 rounded-full transition-colors duration-300 shadow-[0_0_45px_rgba(255,106,0,0.35)] min-h-[56px]"
+                  className="w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-base py-4 rounded-full transition-colors duration-300 min-h-[56px]"
                 >
                   Buy Ticket
                 </button>
@@ -306,32 +303,24 @@ export default function Tickets({ tiers = [], event }) {
             {vip && (
               <div
                 data-testid={`ticket-tier-card-${vip.id}`}
-                className={`mt-5 relative border rounded-3xl p-6 sm:p-7 transition-all duration-300 ${
-                  vipOut
-                    ? "border-white/5 bg-white/[0.02] opacity-50"
-                    : "border-[#C9A227]/40 bg-[#0D0E15] hover:border-[#C9A227]/70 hover:shadow-[0_0_40px_rgba(201,162,39,0.15)]"
+                className={`mt-5 border rounded-3xl p-6 sm:p-8 transition-colors duration-300 ${
+                  vipOut ? "border-white/10 bg-[#0D0E15] opacity-50" : "border-white/10 bg-[#0D0E15] hover:border-[#FF0055]/60"
                 }`}
               >
-                {vipOut && (
-                  <span className="absolute -top-3 left-6 bg-white/10 font-mono2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full text-slate-400" data-testid="vip-soldout-badge">
-                    Sold out
-                  </span>
-                )}
-                <div className="flex items-center justify-between gap-4 mb-5">
-                  <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227]">VIP Table Ticket</p>
-                  <p className="font-display font-black text-2xl sm:text-3xl" data-testid="vip-price">{czk(vip.price_czk)}</p>
-                </div>
+                <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227] mb-3">VIP Table Ticket</p>
+                <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="vip-price">{czk(vip.price_czk)}</p>
+                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500 mb-6">Limited capacity</p>
                 <button
                   data-testid={`buy-ticket-button-${vip.id}`}
                   disabled={vipOut}
                   onClick={() => setSelected(vip)}
-                  className={`w-full font-display font-bold uppercase text-sm py-4 rounded-full transition-colors duration-300 min-h-[56px] ${
+                  className={`w-full font-display font-bold uppercase text-base py-4 rounded-full transition-colors duration-300 min-h-[56px] ${
                     vipOut
                       ? "bg-white/5 text-slate-600 cursor-not-allowed"
-                      : "border border-[#C9A227] text-[#C9A227] hover:bg-[#C9A227] hover:text-black"
+                      : "bg-[#FF6A00] hover:bg-[#FF8534] text-white"
                   }`}
                 >
-                  {vipOut ? "Sold Out" : "Buy VIP"}
+                  {vipOut ? "Sold Out" : "Buy Ticket"}
                 </button>
               </div>
             )}
@@ -382,7 +371,7 @@ export default function Tickets({ tiers = [], event }) {
                     "VIP toilets access",
                   ].map((p) => (
                     <li key={p} className="flex items-start gap-2.5">
-                      <span className="mt-0.5 shrink-0 text-sm leading-none">🏆</span> {p}
+                      <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {p}
                     </li>
                   ))}
                 </ul>
