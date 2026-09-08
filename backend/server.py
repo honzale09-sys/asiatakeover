@@ -1080,10 +1080,13 @@ async def admin_stats(admin=Depends(get_current_admin)):
 @api_router.get("/admin/orders")
 async def admin_orders(admin=Depends(get_current_admin)):
     orders = await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    visible = []
     for o in orders:
         o["tickets"] = await db.tickets.find({"order_id": o["id"]}, {"_id": 0}).to_list(50)
         o["payment_status"] = o.get("payment_status") or o.get("status", "paid_mock")
-    return orders
+        if o["payment_status"] not in ("created", "pending"):
+            visible.append(o)
+    return visible
 
 
 @api_router.delete("/admin/orders/{order_id}")
