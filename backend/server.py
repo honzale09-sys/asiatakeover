@@ -467,6 +467,8 @@ EMAIL_BASE_URL = "https://integrations.emergentagent.com"
 EMAIL_KEY = os.environ.get("EMERGENT_EMAIL_KEY", "")
 EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Asia Takeover")
 EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO") or None
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM = os.environ.get("RESEND_FROM", "Asia Takeover <hello@asiatakeover.com>")
 
 _SHORTENERS = ("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "goo.gl", "rebrand.ly")
 _CRED_ASK = ("reply with your password", "reply with the code", "send your password", "cvv",
@@ -563,6 +565,8 @@ async def email_rate_gate():
 
 async def send_email(*, to: str, subject: str, html: str, reply_to: Optional[str] = None):
     _assert_safe_email(subject, html)
+    if RESEND_API_KEY:
+        return await _send_email_resend(to=to, subject=subject, html=html, reply_to=reply_to)
     payload = {"to": [to], "subject": subject, "html": html, "from_name": EMAIL_FROM_NAME}
     if reply_to or EMAIL_REPLY_TO:
         payload["contact_email"] = reply_to or EMAIL_REPLY_TO
@@ -578,6 +582,34 @@ async def send_email(*, to: str, subject: str, html: str, reply_to: Optional[str
         raise RuntimeError("Undeliverable recipient — email API blocked this address (422). Check the buyer email is real.")
     if resp.status_code >= 400:
         logger.error("Email send rejected: HTTP %s — %s", resp.status_code, resp.text[:300])
+        raise RuntimeError(f"email API HTTP {resp.status_code}: {resp.text[:200]}")
+    return resp.json().get("id")
+
+
+async def _send_email_resend(*, to: str, subject: str, html: str, reply_to: Optional[str] = None):
+    """Direct Resend API (owner's own account + verified domain)."""
+    payload = {
+        "from": RESEND_FROM,
+        "to": [to],
+        "subject": subject,
+        "html": html,
+        "reply_to": reply_to or EMAIL_REPLY_TO or "hello@asiatakeover.com",
+    }
+    await email_rate_gate()
+    async with httpx.AsyncClient(timeout=30) as c:
+        resp = await c.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+            json=payload,
+        )
+    if resp.status_code == 403:
+        logger.error("Resend domain not verified: %s", resp.text[:200])
+        raise RuntimeError("Resend: domain not verified (403) — finish DNS verification in the Resend dashboard.")
+    if resp.status_code == 422:
+        logger.error("Resend rejected recipient %s: %s", to, resp.text[:200])
+        raise RuntimeError("Undeliverable recipient — Resend rejected this address (422). Check the buyer email is real.")
+    if resp.status_code >= 400:
+        logger.error("Resend send rejected: HTTP %s — %s", resp.status_code, resp.text[:300])
         raise RuntimeError(f"email API HTTP {resp.status_code}: {resp.text[:200]}")
     return resp.json().get("id")
 
