@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend testing of the VIP purchase card additions on /tickets and the gold VIP badge on the /nascanujtobrasko scanner. All requested changes verified end-to-end: (1) VIP card contains data-testid=vip-card-perks-list with exactly the 10 required items (3 green-check + 7 trophy) on both desktop 1920px and mobile 390px with no horizontal overflow; (2) prominent gold notice 'VIP TABLE TICKET REQUIRED TO BOOK A TABLE!' (data-testid=reserve-vip-required-notice) renders between Buy Ticket and Reserve a Table, and the small 'VIP TABLE TICKET REQUIRED' text (data-testid=reserve-vip-required-small) renders under Reserve a Table; (3) Reserve a Table still navigates to /reserve; (4) Standard Buy Ticket opens the checkout modal with phone field (regression OK); (5) Scanner VIP badge (data-testid=scan-vip-badge, text '🏆 VIP TABLE') appears in valid, admitted, and used result panels for the seeded VIP ticket (ATF-VIPTEST1, tier VIP Table Ticket) and does NOT appear for a non-VIP ticket (ATF-9A5FDC / Early Bird). Test ticket cleaned up from MongoDB after testing.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Tickets.js: preexisting React hydration warning — <option> in the quantity <select> contains injected <span> (from dev tooling wrappers), producing 'span cannot be a child of option'. Not caused by this batch and does not break functionality, but should be cleaned up.",
+    "Scanner.js: the 4s auto-clear timer on the result panel can race with fast admit clicks. Consider clearing/extending the timer on successful check-in for stability at the door."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a", "frontend": "100%" },
+  "test_credentials": "admin@asiatakeover.eu / Takeover2026! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Inserted then deleted ticket ATF-VIPTEST1 (tier 'VIP Table Ticket', status 'valid', holder 'Test VIP') in the 'tickets' collection using MONGO_URL/DB_NAME from /app/backend/.env. Also verified against pre-existing non-VIP ticket ATF-9A5FDC (tier 'Early Bird'). No lingering test data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "VIP perks list + gold notice + small text + Reserve link on /tickets are stable at both 1920px and 390px. Scanner VIP badge is rendered from scan-result-valid, scan-result-admitted, and scan-result-used panels via the shared vipBadge variable in Scanner.js (frontend regex /vip/i on ticket.tier_name). Preview lockdown is off. AdminLogin testids use prefix 'scanner-' (scanner-email-input / scanner-password-input / scanner-login-button)."
+}

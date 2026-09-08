@@ -126,6 +126,15 @@ export default function Scanner() {
     );
 
   const t = result?.ticket;
+  const isVip = t && /vip/i.test(t.tier_name || "");
+  const vipBadge = isVip && (
+    <span
+      data-testid="scan-vip-badge"
+      className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#C9A227] bg-[#C9A227]/15 px-4 py-1.5 font-display font-black uppercase text-sm tracking-wider text-[#C9A227] shadow-[0_0_25px_rgba(201,162,39,0.35)]"
+    >
+      🏆 VIP Table
+    </span>
+  );
 
   return (
     <div className="min-h-screen bg-[#060609] text-white" data-testid="scanner-page">
@@ -220,6 +229,7 @@ export default function Scanner() {
                 <p className="font-mono2 text-sm text-white">{t.code}</p>
                 <p className="text-slate-300 text-sm mt-1">{t.holder_name}</p>
                 <p className="font-mono2 text-xs text-[#00F0FF] mt-1 uppercase tracking-wider">{t.tier_name}</p>
+                {vipBadge}
                 <button
                   onClick={checkin}
                   data-testid="checkin-button"
@@ -235,6 +245,7 @@ export default function Scanner() {
                 <p className="font-display font-black text-3xl uppercase text-emerald-400 mb-3">Admitted</p>
                 <p className="font-mono2 text-sm text-white">{t.code}</p>
                 <p className="text-slate-300 text-sm mt-1">{t.holder_name} · {t.tier_name}</p>
+                {vipBadge}
                 <p className="font-mono2 text-xs text-slate-400 mt-2">Ticket is now marked as used. Scan the next guest.</p>
               </div>
             )}
@@ -252,6 +263,7 @@ export default function Scanner() {
                 <p className="font-display font-black text-3xl uppercase text-[#FFE600] mb-3">Already Used</p>
                 <p className="font-mono2 text-sm text-white">{t.code}</p>
                 <p className="text-slate-300 text-sm mt-1">{t.holder_name} · {t.tier_name}</p>
+                {vipBadge}
                 <p className="font-mono2 text-xs text-slate-400 mt-2">
                   Checked in at {t.checked_in_at ? new Date(t.checked_in_at).toLocaleString("cs-CZ") : "—"}
                   {t.checked_in_by ? ` by ${t.checked_in_by}` : ""}

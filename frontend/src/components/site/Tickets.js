@@ -363,7 +363,31 @@ export default function Tickets({ tiers = [], event }) {
               >
                 <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227] mb-3">VIP Table Ticket</p>
                 <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="vip-price">{czk(vip.price_czk)}</p>
-                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500 mb-6">Limited capacity</p>
+                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500 mb-5">Limited capacity</p>
+                <ul className="text-left space-y-2.5 text-sm text-slate-300 mb-6" data-testid="vip-card-perks-list">
+                  {[
+                    "Access to all 3 stages",
+                    "Standing and dance floor access",
+                    "Access to all public bars and rooftops",
+                  ].map((p) => (
+                    <li key={p} className="flex items-start gap-2.5">
+                      <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {p}
+                    </li>
+                  ))}
+                  {[
+                    "Surprise gift ❤️‍🔥🎈 (value 200 Kč)",
+                    "Access to all VIP table areas",
+                    "Ability to reserve a VIP table with bottle service",
+                    "Hostess service with your table reservation",
+                    "Access to the VIP balcony on the 7th floor",
+                    "Priority entry",
+                    "VIP toilets",
+                  ].map((p) => (
+                    <li key={p} className="flex items-start gap-2.5">
+                      <span className="mt-0.5 shrink-0 text-sm leading-none">🏆</span> {p}
+                    </li>
+                  ))}
+                </ul>
                 <button
                   data-testid={`buy-ticket-button-${vip.id}`}
                   disabled={vipOut}
@@ -376,6 +400,12 @@ export default function Tickets({ tiers = [], event }) {
                 >
                   {vipOut ? "Sold Out" : "Buy Ticket"}
                 </button>
+                <p
+                  data-testid="reserve-vip-required-notice"
+                  className="mt-4 text-center font-display font-extrabold uppercase text-[13px] sm:text-sm tracking-wide text-[#C9A227]"
+                >
+                  VIP Table Ticket required to book a table!
+                </p>
                 <Link
                   to="/reserve"
                   data-testid="reserve-table-button"
@@ -383,6 +413,12 @@ export default function Tickets({ tiers = [], event }) {
                 >
                   Reserve a Table
                 </Link>
+                <p
+                  data-testid="reserve-vip-required-small"
+                  className="mt-2 text-center font-mono2 text-[10px] uppercase tracking-[0.2em] text-[#C9A227]/80"
+                >
+                  VIP Table Ticket required
+                </p>
               </div>
             )}
           </div>
