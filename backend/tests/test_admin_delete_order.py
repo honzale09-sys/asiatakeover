@@ -32,51 +32,30 @@ def test_get_admin_orders_unauthenticated_forbidden():
 
 # --- delete flow: create order (unpaid teya session is fine), delete, verify gone ---
 def test_admin_delete_order_full_flow(admin_session):
-    # Create a fresh test order via public endpoint
+    # Create a fresh test order via public endpoint (unpaid — hidden from admin list by design)
     payload = {
         "tier_id": GA_TIER_ID,
         "quantity": 1,
         "name": "TEST Delete Buyer",
         "email": "test_delete@example.com",
-        "promo_code": "ATFTEST95",
+        "phone": "+420000000000",
+        "promo_code": "MZYPL5BKOD",
     }
     r = requests.post(f"{BASE_URL}/api/orders/create", json=payload, timeout=20)
     assert r.status_code == 200, r.text
     data = r.json()
     order_id = data.get("order_id") or data.get("id")
-    # order_id might be nested — fall back to searching admin list
-    if not order_id:
-        orders = admin_session.get(f"{BASE_URL}/api/admin/orders", timeout=15).json()
-        # find newest matching TEST_delete
-        for o in orders:
-            if o.get("email") == "test_delete@example.com":
-                order_id = o["id"]
-                break
     assert order_id, f"could not resolve order_id from response {data}"
 
-    # Ensure it appears in admin list
+    # Unpaid orders are intentionally hidden from the admin list
     orders = admin_session.get(f"{BASE_URL}/api/admin/orders", timeout=15).json()
-    assert any(o["id"] == order_id for o in orders), "created order not in admin list"
-
-    # Snapshot ticket codes (may be empty for unpaid teya but check anyway)
-    the_order = next(o for o in orders if o["id"] == order_id)
-    ticket_codes = [t["code"] for t in the_order.get("tickets", [])]
+    assert not any(o["id"] == order_id for o in orders), "unpaid order should be hidden from admin list"
 
     # Delete
     dr = admin_session.delete(f"{BASE_URL}/api/admin/orders/{order_id}", timeout=15)
     assert dr.status_code == 200, dr.text
     body = dr.json()
     assert body.get("ok") is True
-
-    # Verify gone from admin list
-    orders2 = admin_session.get(f"{BASE_URL}/api/admin/orders", timeout=15).json()
-    assert not any(o["id"] == order_id for o in orders2), "order still present after delete"
-
-    # Verify tickets invalidated via scan/lookup (admin protected)
-    for code in ticket_codes:
-        r2 = admin_session.post(f"{BASE_URL}/api/scan/lookup", json={"code": code}, timeout=10)
-        assert r2.status_code == 200
-        assert r2.json().get("result") == "invalid", f"ticket {code} still valid"
 
     # Second delete → 404
     dr2 = admin_session.delete(f"{BASE_URL}/api/admin/orders/{order_id}", timeout=10)

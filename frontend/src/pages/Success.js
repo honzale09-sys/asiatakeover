@@ -48,7 +48,7 @@ export default function Success() {
         }
         if (FINAL_FAIL.has(ps) || ps === "refunded" || ps === "partially_refunded") return;
         tries.current += 1;
-        if (tries.current < 40) timer = setTimeout(poll, 3000);
+        if (tries.current < 450) timer = setTimeout(poll, 4000);
       } catch {
         setStatus({ payment_status: "missing" });
       }
@@ -70,6 +70,12 @@ export default function Success() {
             <p className="text-slate-400 text-sm">
               We're verifying your payment with the payment gateway. This page updates automatically — no need to refresh.
             </p>
+            {tries.current > 10 && (
+              <p className="text-slate-500 text-sm mt-4" data-testid="success-slow-note">
+                It's taking a bit longer than usual — your payment is still being confirmed. Once it's done, your tickets appear
+                here and we also send them to your email. You can safely keep this page open.
+              </p>
+            )}
           </div>
         )}
 

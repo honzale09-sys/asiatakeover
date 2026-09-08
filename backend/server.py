@@ -5,6 +5,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import base64
+import asyncio
 import hashlib
 import io
 import ipaddress
@@ -540,11 +541,32 @@ def _assert_safe_email(subject: str, html: str) -> None:
                 raise ValueError(f"Anchor text {m.group(1)!r} != real link host {real!r}")
 
 
+async def email_rate_gate():
+    """Cluster-wide throttle: min interval between email API calls across all pods,
+    enforced via an atomic Mongo update. Prevents bursts from tripping the provider rate limit."""
+    for _ in range(60):
+        now = time.time()
+        doc = await db.email_rate.find_one_and_update(
+            {"key": "gate", "last": {"$lt": now - 8}},
+            {"$set": {"last": now}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if doc:
+            return
+        try:
+            await db.email_rate.insert_one({"key": "gate", "last": 0.0})
+        except Exception:
+            pass
+        await asyncio.sleep(2)
+    logger.warning("Email rate gate wait exceeded — sending anyway")
+
+
 async def send_email(*, to: str, subject: str, html: str, reply_to: Optional[str] = None):
     _assert_safe_email(subject, html)
     payload = {"to": [to], "subject": subject, "html": html, "from_name": EMAIL_FROM_NAME}
     if reply_to or EMAIL_REPLY_TO:
         payload["contact_email"] = reply_to or EMAIL_REPLY_TO
+    await email_rate_gate()
     async with httpx.AsyncClient(timeout=30) as c:
         resp = await c.post(
             f"{EMAIL_BASE_URL}/api/v1/email/send",
@@ -617,6 +639,67 @@ async def send_ticket_email(order: dict):
     return await send_email(to=order["buyer_email"], subject=subject, html=html)
 
 
+async def send_ticket_email_with_retry(order_id: str):
+    """Background sender: retries transient failures (e.g. HTTP 429 rate limit) with backoff.
+    Permanent failures (undeliverable recipient) are not retried."""
+    delays = [15, 60, 180, 600, 900, 1800]
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        return
+    for attempt in range(len(delays) + 1):
+        try:
+            email_id = await send_ticket_email(order)
+            await db.orders.update_one(
+                {"id": order_id},
+                {"$set": {"ticket_email_sent_at": utcnow().isoformat(),
+                          "ticket_email_id": email_id, "ticket_email_error": None}},
+            )
+            logger.info("Ticket email sent for order %s (attempt %d)", order_id, attempt + 1)
+            return
+        except Exception as e:
+            msg = str(e)[:250]
+            logger.warning("Ticket email attempt %d failed for order %s: %s", attempt + 1, order_id, msg)
+            await db.orders.update_one({"id": order_id}, {"$set": {"ticket_email_error": msg}})
+            if "Undeliverable recipient" in msg:
+                return
+            if attempt < len(delays):
+                await asyncio.sleep(delays[attempt])
+    logger.error("Ticket email permanently failed for order %s after retries", order_id)
+
+
+async def retry_unsent_ticket_emails():
+    """Startup sweep: resend ticket emails for paid orders whose email previously failed
+    transiently (rate limits etc.). Permanent 422 'undeliverable' failures are skipped.
+    Single-flight across pods via a Mongo lock; actual send pacing is enforced by email_rate_gate."""
+    try:
+        now = time.time()
+        lock = await db.email_rate.find_one_and_update(
+            {"key": "sweep_lock", "until": {"$lt": now}},
+            {"$set": {"until": now + 900}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not lock:
+            try:
+                await db.email_rate.insert_one({"key": "sweep_lock", "until": now + 900})
+            except Exception:
+                logger.info("Email retry sweep already running on another pod")
+                return
+        cursor = db.orders.find({
+            "payment_status": "paid",
+            "ticket_email_sent_at": None,
+            "ticket_email_error": {"$not": {"$regex": "Undeliverable"}},
+        })
+        n = 0
+        async for o in cursor:
+            asyncio.create_task(send_ticket_email_with_retry(o["id"]))
+            n += 1
+            await asyncio.sleep(3)
+        if n:
+            logger.info("Retrying ticket emails for %d paid order(s)", n)
+    except Exception as e:
+        logger.warning("Ticket email retry sweep failed: %s", str(e)[:200])
+
+
 @api_router.get("/qr/{code}.png")
 async def qr_png(code: str):
     clean = code.strip().upper()
@@ -654,19 +737,7 @@ async def fulfill_order(order_id: str):
             "checked_in_at": None, "checked_in_by": None,
         })
     await send_capi_purchase(order)
-    try:
-        email_id = await send_ticket_email(order)
-        await db.orders.update_one(
-            {"id": order_id},
-            {"$set": {"ticket_email_sent_at": utcnow().isoformat(),
-                      "ticket_email_id": email_id, "ticket_email_error": None}},
-        )
-    except Exception as e:
-        logger.error("Ticket email failed for order %s: %s", order_id, str(e)[:250])
-        await db.orders.update_one(
-            {"id": order_id},
-            {"$set": {"ticket_email_error": str(e)[:250]}},
-        )
+    asyncio.create_task(send_ticket_email_with_retry(order["id"]))
     logger.info("Order %s fulfilled: %d ticket(s) issued", order["id"], order["quantity"])
 
 
@@ -1137,11 +1208,14 @@ async def resend_ticket_email(order_id: str, admin=Depends(get_current_admin)):
         return {"ok": True, "email_id": email_id}
     except Exception as e:
         logger.error("Admin resend email failed for order %s: %s", order_id, str(e)[:250])
-        await db.orders.update_one(
-            {"id": order_id}, {"$set": {"ticket_email_error": str(e)[:250]}})
+        if not order.get("ticket_email_sent_at"):
+            await db.orders.update_one(
+                {"id": order_id}, {"$set": {"ticket_email_error": str(e)[:250]}})
         msg = str(e)[:200]
         if "Undeliverable recipient" in msg:
             raise HTTPException(422, msg)
+        if "429" in msg or "Rate limited" in msg:
+            raise HTTPException(429, "Email service is rate-limited right now — the ticket email will be retried automatically. Try again in a few minutes.")
         raise HTTPException(502, f"Email send failed: {msg}")
 
 
@@ -1339,6 +1413,7 @@ async def startup():
     await db.tickets.create_index("order_id")
     await db.sim_payments.create_index("id", unique=True)
     await db.meta_events.create_index("event_id", unique=True)
+    await db.email_rate.create_index("key", unique=True)
     await db.promo_codes.create_index("code", unique=True)
     await db.promo_codes.update_one(
         {"code": "ATFTEST95"},
@@ -1352,6 +1427,7 @@ async def startup():
     )
     await seed_admin()
     await seed_event()
+    asyncio.create_task(retry_unsent_ticket_emails())
 
 
 app.include_router(api_router)
