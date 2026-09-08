@@ -133,6 +133,10 @@ function CheckoutModal({ tier, event, onClose }) {
 
   const pay = async (e) => {
     e.preventDefault();
+    if (promoInput.trim() && !promoApplied) {
+      toast.error("Click Apply to activate your discount code before paying.");
+      return;
+    }
     setStep("processing");
     try {
       const r = await api.post("/orders/create", {
