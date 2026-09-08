@@ -1345,6 +1345,11 @@ async def startup():
         {"$set": {"active": False}, "$setOnInsert": {"code": "ATFTEST95", "percent_off": 95}},
         upsert=True,
     )
+    await db.promo_codes.update_one(
+        {"code": "MZYPL5BKOD"},
+        {"$set": {"active": True}, "$setOnInsert": {"code": "MZYPL5BKOD", "percent_off": 95}},
+        upsert=True,
+    )
     await seed_admin()
     await seed_event()
 

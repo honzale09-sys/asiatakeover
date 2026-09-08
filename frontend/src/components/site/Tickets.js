@@ -287,12 +287,12 @@ export default function Tickets({ tiers = [], event }) {
 
   return (
     <section id="tickets" className="px-4 sm:px-8 lg:px-16 py-12 lg:py-20" data-testid="tickets-section">
-      <div className="grid gap-10 lg:grid-cols-[1fr_minmax(0,400px)_1fr] lg:gap-12 items-start" data-testid="ticket-tiers">
-        <Reveal className="lg:order-2">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-14 items-start max-w-6xl mx-auto" data-testid="ticket-tiers">
+        <Reveal className="lg:order-1">
           <PosterCarousel />
         </Reveal>
 
-        <Reveal delay={0.05} className="lg:order-3">
+        <Reveal delay={0.05} className="lg:order-2">
           <div className="max-w-md mx-auto lg:mx-0">
             <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-2">Tickets</p>
             <h2 className="font-display text-xl sm:text-2xl font-extrabold uppercase tracking-tight mb-1">
@@ -321,9 +321,25 @@ export default function Tickets({ tiers = [], event }) {
               >
                 <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">Standard Ticket</p>
                 <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="ga-price">{czk(activeGA.price_czk)}</p>
-                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600] mb-6" data-testid="next-release">
+                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600] mb-5" data-testid="next-release">
                   {nextGA ? `Next release: ${czk(nextGA.price_czk)}` : "Final online ticket release"}
                 </p>
+                <ul className="space-y-2.5 text-sm text-slate-300 mb-6" data-testid="standard-card-perks-list">
+                  {[
+                    "Access to all 3 stages",
+                    "Standing and dance floor access",
+                    "Access to all public bars and rooftops",
+                  ].map((d) => (
+                    <li key={d} className="flex items-start gap-2.5">
+                      <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {d}
+                    </li>
+                  ))}
+                  {["No access to VIP table areas", "No reserved table or guaranteed seating", "No bottle service"].map((d) => (
+                    <li key={d} className="flex items-start gap-2.5">
+                      <X size={15} className="text-[#FF0055] mt-0.5 shrink-0" /> {d}
+                    </li>
+                  ))}
+                </ul>
                 <button
                   data-testid={`buy-ticket-button-${activeGA.id}`}
                   onClick={() => setSelected(activeGA)}
@@ -400,12 +416,6 @@ export default function Tickets({ tiers = [], event }) {
                 >
                   {vipOut ? "Sold Out" : "Buy Ticket"}
                 </button>
-                <p
-                  data-testid="reserve-vip-required-notice"
-                  className="mt-4 text-center font-display font-extrabold uppercase text-[13px] sm:text-sm tracking-wide text-[#C9A227]"
-                >
-                  VIP Table Ticket required to book a table!
-                </p>
                 <Link
                   to="/reserve"
                   data-testid="reserve-table-button"
@@ -421,67 +431,13 @@ export default function Tickets({ tiers = [], event }) {
                 </p>
               </div>
             )}
-          </div>
-        </Reveal>
 
-        <Reveal className="lg:order-1">
-          <div className="max-w-md mx-auto lg:mx-0" data-testid="ticket-details">
-            <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-4">Details</p>
-            <h2 className="font-display text-xl sm:text-2xl font-extrabold uppercase tracking-tight mb-6">
-              What your ticket <span className="text-[#FF0055]">includes</span>
-            </h2>
-            <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-4" data-testid="standard-perks-label">Standard Ticket</p>
-            <ul className="space-y-3 text-sm text-slate-300">
-              {[
-                "Access to all 3 stages",
-                "Standing and dance floor access",
-                "Access to all public bars and rooftops",
-              ].map((d) => (
-                <li key={d} className="flex items-start gap-2.5">
-                  <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {d}
-                </li>
-              ))}
-              {["No access to VIP table areas", "No reserved table or guaranteed seating", "No bottle service"].map((d) => (
-                <li key={d} className="flex items-start gap-2.5">
-                  <X size={15} className="text-[#FF0055] mt-0.5 shrink-0" /> {d}
-                </li>
-              ))}
-            </ul>
-            <p className="text-sm text-slate-400 mt-5 leading-relaxed" data-testid="standard-vip-note">
+            <p className="text-sm text-slate-400 mt-6 leading-relaxed" data-testid="standard-vip-note">
               Want to book a table with bottle service? A <span className="text-[#C9A227]">VIP Table Ticket</span> is required.
             </p>
-            <p className="font-mono2 text-[10px] uppercase tracking-[0.15em] text-slate-600 mt-6 leading-relaxed" data-testid="ticket-no-refund-note">
+            <p className="font-mono2 text-[10px] uppercase tracking-[0.15em] text-slate-600 mt-4 leading-relaxed" data-testid="ticket-no-refund-note">
               Tickets are non-refundable · full refund only if the event is cancelled by the organizer
             </p>
-            {vip && (
-              <div className="mt-8 pt-6 border-t border-white/5">
-                <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#C9A227] mb-4">VIP Table Ticket</p>
-                <ul className="space-y-2.5 text-sm text-slate-300" data-testid="vip-perks-list">
-                  {[
-                    "Access to all 3 stages",
-                    "Standing and dance floor access",
-                    "Access to all public bars and rooftops",
-                  ].map((p) => (
-                    <li key={p} className="flex items-start gap-2.5">
-                      <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {p}
-                    </li>
-                  ))}
-                  {[
-                    "Surprise gift ❤️‍🔥🎈 (value 200 Kč)",
-                    "Access to all VIP table areas",
-                    "Ability to reserve a VIP table with bottle service",
-                    "Hostess service with your table reservation",
-                    "Access to the VIP balcony on the 7th floor",
-                    "Priority entry",
-                    "VIP toilets",
-                  ].map((p) => (
-                    <li key={p} className="flex items-start gap-2.5">
-                      <span className="mt-0.5 shrink-0 text-sm leading-none">🏆</span> {p}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         </Reveal>
       </div>
