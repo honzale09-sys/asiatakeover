@@ -398,8 +398,10 @@ export default function Tickets({ tiers = [], event }) {
               >
                 <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#C9A227] mb-3">VIP Table Ticket</p>
                 <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="vip-price">{czk(vip.price_czk)}</p>
-                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500 mb-5">
-                  {vipOut ? "Sold out" : nextVip ? `Limited capacity · Next release: ${czk(nextVip.price_czk)}` : "Limited capacity"}
+                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-slate-500 mb-5" data-testid="vip-next-release">
+                  {vipOut ? "Sold out" : nextVip ? (
+                    <>Limited capacity · <span className="text-[#FFE600]">Next release: {czk(nextVip.price_czk)}</span></>
+                  ) : "Limited capacity"}
                 </p>
                 <ul className="text-left space-y-2.5 text-sm text-slate-300 mb-6" data-testid="vip-card-perks-list">
                   {[
