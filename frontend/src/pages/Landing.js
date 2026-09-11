@@ -7,6 +7,7 @@ import Hero from "@/components/site/Hero";
 import Footer from "@/components/site/Footer";
 import { Reveal } from "@/components/site/Reveal";
 import { WatchTheTakeover, ExploreStages, WhoPlays, InsideDuplex, BuyTicketsCta } from "@/components/site/HomeSections";
+import { useT } from "@/i18n";
 
 const FALLBACK = {
   event: {
@@ -27,12 +28,13 @@ const FALLBACK = {
 };
 
 function UpcomingEvents({ event }) {
+  const { t } = useT();
   return (
     <section className="px-4 sm:px-8 lg:px-16 py-12 lg:py-16 bg-[#0B0C12] border-y border-white/5" data-testid="upcoming-events-section">
       <Reveal>
-        <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-3">Save the date</p>
+        <p className="font-mono2 text-[11px] uppercase tracking-[0.3em] text-[#00F0FF] mb-3">{t("land.saveDate")}</p>
         <h2 className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold uppercase tracking-tight mb-8">
-          Upcoming <span className="text-[#FF0055]">Events</span>
+          {t("land.upcomingA")} <span className="text-[#FF0055]">{t("land.upcomingB")}</span>
         </h2>
         <Link
           to="/tickets"
@@ -47,7 +49,7 @@ function UpcomingEvents({ event }) {
               data-testid="upcoming-event-poster"
             />
             <span className="absolute top-3 left-3 font-mono2 text-[10px] uppercase tracking-[0.2em] bg-[#FF0055] text-white px-2.5 py-1 rounded-md" data-testid="upcoming-event-badge">
-              Festival
+              {t("land.festival")}
             </span>
           </span>
           <span className="mt-4 flex items-center justify-between gap-4">
@@ -55,7 +57,7 @@ function UpcomingEvents({ event }) {
               {event?.date_label || "27.09.2026"} <span className="text-[#FF0055]">•</span> {event?.venue || "DUPLEX"} {event?.city || "Prague"}
             </span>
             <span className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-[#FF6A00] whitespace-nowrap group-hover:text-white transition-colors" data-testid="upcoming-event-cta">
-              Get Tickets →
+              {t("land.getTicketsArrow")}
             </span>
           </span>
         </Link>

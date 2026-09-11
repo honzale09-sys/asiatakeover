@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend-only i18n + soldout-row removal batch verified end-to-end. All 6 languages (EN/VI/MN/KK/KY/ZH) switch cleanly via desktop and mobile pickers; no raw dotted translation keys are visible on any tested page; no console errors (only 2 harmless 404s for missing assets, unrelated to i18n); no horizontal overflow at 390px mobile viewport; localStorage 'atf_lang' persists language across navigations. /tickets no longer renders any [data-testid^='soldout-row-'] and the homepage hero has no hero-soldout-list. Standard checkout modal in VI is fully translated and the promo code MZYPL5BKOD (-95%) applies correctly (499 Kč -> 25 Kč) — modal was closed before Teya payment as required. /success?order_id=nonexistent renders MN not-found copy. /reserve in KY renders translated labels and posts a test reservation successfully with translated success screen. ZH cookie banner buttons are translated (全部接受 / 自定义 / 拒绝可选). EN homepage regression: all sections (Watch the Takeover, 3 Stages, Who plays, Inside Duplex, CTA, Footer) render with no raw keys.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Prices in the review request (549/1996/849) don't match live current release (499/1996/799) — this is because ticket release progression is dynamic; not an i18n bug. Promo -95% verified against actual price 499 -> 25 Kč (spec said 549 -> 28 Kč). Behavior correct.",
+    "Tickets.js VIP card intentionally prepends std1/std2/std3 as green-check perks before the trophy vip1..vip7 perks (verified: first 🏆 li = t('perks.vip1')). Not a bug.",
+    "2 harmless 404s in console (asset requests) observed on homepage — pre-existing, not related to this batch."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "One test reservation posted via /reserve during KY test (name=Test, phone=+420777123456, email=test@example.com, guests=4, msg='i18n test'). This is harmless as expected by the review request.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 6 i18n dictionaries have 155 keys each and are complete. LangProvider persists to localStorage 'atf_lang'. Cookie consent key is 'atf_consent_v1'. To reset language during manual QA: localStorage.removeItem('atf_lang'). Soldout rows removed via Tickets.js/Hero.js; no [data-testid^='soldout-row-'] anywhere in source. VIP first-trophy perk = 4th li (index 3) in [data-testid='vip-card-perks-list']. Group card testid uses dynamic tier id (e.g. ticket-tier-card-grp4test...). Prices are release-based (currently 499/1996/799 Kč).",
+  "rca of the issue": "N/A — no issues found."
+}

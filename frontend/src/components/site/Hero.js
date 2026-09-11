@@ -1,14 +1,15 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { useT } from "@/i18n";
 
 const ease = [0.16, 1, 0.3, 1];
 
 export default function Hero({ event, tiers = [] }) {
+  const { t } = useT();
   const ga = [...tiers]
-    .filter((t) => !t.name.toUpperCase().includes("VIP"))
+    .filter((t2) => !t2.name.toUpperCase().includes("VIP") && !t2.name.toUpperCase().includes("GROUP"))
     .sort((a, b) => a.price_czk - b.price_czk);
-  const isAvailable = (t) => (t.sold || 0) < t.capacity;
-  const soldOutGA = ga.filter((t) => !isAvailable(t));
+  const isAvailable = (t2) => (t2.sold || 0) < t2.capacity;
   const activeGA = ga.find(isAvailable);
 
   return (
@@ -80,18 +81,8 @@ export default function Hero({ event, tiers = [] }) {
             {event?.date_label || "27.09.2026"} • {(event?.venue || "DUPLEX").toUpperCase()} {(event?.city || "PRAGUE").toUpperCase()}
           </p>
           <p className="font-mono2 text-[10px] sm:text-xs tracking-[0.15em] sm:tracking-[0.25em] uppercase text-white/55 mt-3 whitespace-nowrap" data-testid="hero-benefit-line">
-            3 Rooms • 10 DJs • 1 All-Access Ticket
+            {t("hero.benefit")}
           </p>
-
-          {soldOutGA.length > 0 && (
-            <div className="mt-5 space-y-1" data-testid="hero-soldout-list">
-              {soldOutGA.map((t) => (
-                <p key={t.id} className="font-mono2 text-[10px] uppercase tracking-[0.25em] text-slate-500">
-                  {t.name} — Sold Out
-                </p>
-              ))}
-            </div>
-          )}
 
           {activeGA ? (
             <Link
@@ -99,11 +90,11 @@ export default function Hero({ event, tiers = [] }) {
               data-testid="buy-tickets-button"
               className="mt-7 inline-block whitespace-nowrap bg-[#FF6A00] hover:bg-[#FF8534] active:scale-95 text-white font-display font-bold uppercase text-xs sm:text-base tracking-[0.12em] sm:tracking-[0.15em] px-8 sm:px-12 py-4 rounded-full shadow-[0_0_24px_rgba(255,106,0,0.3)] transition-all duration-300 min-h-[54px]"
             >
-              Get Tickets
+              {t("hero.getTickets")}
             </Link>
           ) : (
             <p className="mt-7 font-display font-bold uppercase text-sm tracking-[0.2em] text-slate-500" data-testid="hero-soldout-all">
-              Sold Out
+              {t("hero.soldOut")}
             </p>
           )}
         </motion.div>

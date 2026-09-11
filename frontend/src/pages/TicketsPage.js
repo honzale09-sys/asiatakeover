@@ -3,10 +3,13 @@ import { Link } from "react-router-dom";
 import { api } from "@/api";
 import { trackEvent } from "@/lib/tracking";
 import Tickets from "@/components/site/Tickets";
+import { LangPicker } from "@/components/site/Navbar";
+import { useT } from "@/i18n";
 
 export default function TicketsPage() {
   const [site, setSite] = useState(null);
   const [failed, setFailed] = useState(false);
+  const { t } = useT();
 
   useEffect(() => {
     api
@@ -34,16 +37,17 @@ export default function TicketsPage() {
           ← Asia Takeover
         </Link>
         <div className="flex items-center gap-4 opacity-80">
-          <img src="/assets/logo-gangshii.png" alt="GANGSHII" className="h-3.5 object-contain" />
-          <img src="/assets/logo-duplex-clean.png" alt="DUPLEX" className="h-4 object-contain" />
-          <img src="/assets/logo-seoulvibes.jpg" alt="Seoul Vibes" className="h-6 w-6 rounded-full object-cover ring-1 ring-white/30" />
+          <img src="/assets/logo-gangshii.png" alt="GANGSHII" className="h-3.5 object-contain hidden sm:block" />
+          <img src="/assets/logo-duplex-clean.png" alt="DUPLEX" className="h-4 object-contain hidden sm:block" />
+          <img src="/assets/logo-seoulvibes.jpg" alt="Seoul Vibes" className="h-6 w-6 rounded-full object-cover ring-1 ring-white/30 hidden sm:block" />
+          <LangPicker />
         </div>
       </header>
       {site ? (
         <Tickets tiers={site.tiers} event={site.event} />
       ) : (
         <p className="px-5 py-24 text-center font-mono2 text-xs uppercase tracking-[0.3em] text-white/40" data-testid="tickets-loading">
-          {failed ? "Tickets unavailable right now" : "Loading tickets…"}
+          {failed ? t("tickets.unavailable") : t("tickets.loading")}
         </p>
       )}
     </div>

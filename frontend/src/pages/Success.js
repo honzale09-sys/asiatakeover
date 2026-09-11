@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, czk } from "@/api";
 import { trackEvent } from "@/lib/tracking";
+import { useT } from "@/i18n";
 
 const FINAL_FAIL = new Set(["failed", "cancelled", "timeouted"]);
 
@@ -58,6 +59,7 @@ export default function Success() {
   }, [orderId]);
 
   const ps = status?.payment_status;
+  const { t } = useT();
 
   return (
     <div className="min-h-screen bg-[#060609] text-white flex items-center justify-center px-4" data-testid="success-page">
@@ -66,14 +68,13 @@ export default function Success() {
         {(!status || ps === "created" || ps === "pending") && (
           <div data-testid="success-processing">
             <div className="w-12 h-12 mx-auto rounded-full border-2 border-white/15 border-t-[#FF6A00] animate-spin" />
-            <h1 className="font-display font-extrabold text-2xl uppercase mt-6 mb-2">Confirming your payment…</h1>
+            <h1 className="font-display font-extrabold text-2xl uppercase mt-6 mb-2">{t("success.confirming")}</h1>
             <p className="text-slate-400 text-sm">
-              We're verifying your payment with the payment gateway. This page updates automatically — no need to refresh.
+              {t("success.confirmingText")}
             </p>
             {tries.current > 10 && (
               <p className="text-slate-500 text-sm mt-4" data-testid="success-slow-note">
-                It's taking a bit longer than usual — your payment is still being confirmed. Once it's done, your tickets appear
-                here and we also send them to your email. You can safely keep this page open.
+                {t("success.slowNote")}
               </p>
             )}
           </div>
@@ -81,11 +82,14 @@ export default function Success() {
 
         {(ps === "paid" || ps === "paid_mock") && (
           <div data-testid="success-paid" className="text-left">
-            <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-[#00F0FF] mb-2 text-center">Payment confirmed</p>
-            <h1 className="font-display font-extrabold text-2xl uppercase mb-2 text-center text-[#FF6A00]">You're in!</h1>
+            <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-[#00F0FF] mb-2 text-center">{t("success.confirmed")}</p>
+            <h1 className="font-display font-extrabold text-2xl uppercase mb-2 text-center text-[#FF6A00]">{t("success.youreIn")}</h1>
             <p className="text-slate-400 text-sm mb-6 text-center">
-              Order <span className="font-mono2 text-slate-300">{orderId?.slice(0, 8)}</span> · {status.tier_name} × {status.quantity} ·{" "}
-              {czk(status.amount_czk)} · Screenshot your tickets and show the QR code at the entrance.
+              {t("success.orderLine")
+                .replace("{order}", orderId?.slice(0, 8) || "")
+                .replace("{tier}", status.tier_name || "")
+                .replace("{qty}", status.quantity)
+                .replace("{amount}", czk(status.amount_czk))}
             </p>
             <div className="grid sm:grid-cols-2 gap-4">
               {(tickets || []).map((t) => (
@@ -101,7 +105,7 @@ export default function Success() {
                 </div>
               ))}
               {!tickets && (
-                <p className="font-mono2 text-xs text-slate-500 col-span-2 text-center py-6">Loading your tickets…</p>
+                <p className="font-mono2 text-xs text-slate-500 col-span-2 text-center py-6">{t("success.loadingTickets")}</p>
               )}
             </div>
           </div>
@@ -109,33 +113,33 @@ export default function Success() {
 
         {FINAL_FAIL.has(ps) && (
           <div data-testid="success-failed">
-            <h1 className="font-display font-extrabold text-2xl uppercase mb-2 text-[#FF0055]">Payment not completed</h1>
+            <h1 className="font-display font-extrabold text-2xl uppercase mb-2 text-[#FF0055]">{t("success.notCompleted")}</h1>
             <p className="text-slate-400 text-sm mb-6">
-              {ps === "cancelled" ? "The payment was cancelled." : ps === "timeouted" ? "The payment session expired." : "The payment failed."}{" "}
-              No tickets were issued and you have not been charged.
+              {ps === "cancelled" ? t("success.cancelled") : ps === "timeouted" ? t("success.expired") : t("success.failed")}{" "}
+              {t("success.noCharge")}
             </p>
             <Link
               to="/tickets"
               data-testid="success-back-to-tickets"
               className="inline-block bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-sm px-8 py-3.5 rounded-full transition-colors"
             >
-              Back to Tickets
+              {t("success.backToTickets")}
             </Link>
           </div>
         )}
 
         {(ps === "refunded" || ps === "partially_refunded") && (
           <div data-testid="success-refunded">
-            <h1 className="font-display font-extrabold text-2xl uppercase mb-2 text-[#FFE600]">Order refunded</h1>
-            <p className="text-slate-400 text-sm">This order has been {ps === "refunded" ? "fully" : "partially"} refunded.</p>
+            <h1 className="font-display font-extrabold text-2xl uppercase mb-2 text-[#FFE600]">{t("success.refunded")}</h1>
+            <p className="text-slate-400 text-sm">{t("success.refundedText").replace("{how}", ps === "refunded" ? t("success.fully") : t("success.partially"))}</p>
           </div>
         )}
 
         {ps === "missing" && (
           <div data-testid="success-missing">
-            <h1 className="font-display font-extrabold text-2xl uppercase mb-2">Order not found</h1>
-            <p className="text-slate-400 text-sm mb-6">We couldn't find this order. If you just paid, wait a moment and check again.</p>
-            <Link to="/" className="font-mono2 text-xs uppercase tracking-[0.2em] text-[#00F0FF]">← Back home</Link>
+            <h1 className="font-display font-extrabold text-2xl uppercase mb-2">{t("success.notFound")}</h1>
+            <p className="text-slate-400 text-sm mb-6">{t("success.notFoundText")}</p>
+            <Link to="/" className="font-mono2 text-xs uppercase tracking-[0.2em] text-[#00F0FF]">{t("success.backHome")}</Link>
           </div>
         )}
       </div>

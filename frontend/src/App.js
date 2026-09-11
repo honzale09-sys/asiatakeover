@@ -15,6 +15,7 @@ import Admin from "@/pages/Admin";
 import Scanner from "@/pages/Scanner";
 import CookieBanner from "@/components/CookieBanner";
 import Lockdown from "@/components/Lockdown";
+import { LangProvider } from "@/i18n";
 import { captureAttribution, getConsent, initGTM, initPixel, marketingAllowed, trackEvent } from "@/lib/tracking";
 
 function RouteTracker() {
@@ -34,6 +35,7 @@ function RouteTracker() {
 
 export default function App() {
   return (
+    <LangProvider>
     <BrowserRouter>
       <Toaster theme="dark" position="top-center" richColors />
       <RouteTracker />
@@ -53,5 +55,6 @@ export default function App() {
         <Route path="/nascanujtobrasko" element={<Scanner />} />
       </Routes>
     </BrowserRouter>
+    </LangProvider>
   );
 }
