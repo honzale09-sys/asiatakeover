@@ -60,8 +60,28 @@ function OverviewTab() {
 function OrdersTab() {
   const [orders, setOrders] = useState([]);
   const [q, setQ] = useState("");
-  const load = () => api.get("/admin/orders").then((r) => setOrders(r.data)).catch((e) => toast.error(formatError(e)));
+  const [showAbandoned, setShowAbandoned] = useState(false);
+  const load = (incl = showAbandoned) =>
+    api.get(`/admin/orders${incl ? "?include_unpaid=1" : ""}`).then((r) => setOrders(r.data)).catch((e) => toast.error(formatError(e)));
   useEffect(() => { load(); }, []);
+
+  const toggleAbandoned = () => {
+    const next = !showAbandoned;
+    setShowAbandoned(next);
+    load(next);
+  };
+
+  const syncPayment = async (id) => {
+    try {
+      const r = await api.post(`/admin/orders/${id}/sync-payment`);
+      const st = r.data.payment_status;
+      if (st === "paid") toast.success(`Payment confirmed — ${r.data.tickets} ticket(s) issued and email queued`);
+      else toast.info(`Teya still reports: ${st}`);
+      load();
+    } catch (e) {
+      toast.error(formatError(e));
+    }
+  };
 
   const resend = async (id) => {
     try {
@@ -121,6 +141,15 @@ function OrdersTab() {
         >
           <Download size={14} /> Export CSV
         </button>
+        <button
+          onClick={toggleAbandoned}
+          data-testid="orders-show-abandoned-toggle"
+          className={`flex items-center justify-center gap-2 border font-mono2 text-xs uppercase tracking-[0.15em] px-5 py-2.5 rounded-lg transition-colors ${
+            showAbandoned ? "border-[#FFE600] text-[#FFE600]" : "border-white/15 hover:border-[#FFE600] hover:text-[#FFE600]"
+          }`}
+        >
+          Abandoned {showAbandoned ? "ON" : "OFF"}
+        </button>
       </div>
       <div className="overflow-x-auto border border-white/10 rounded-2xl">
         <table className="w-full text-sm" data-testid="orders-table">
@@ -167,6 +196,15 @@ function OrdersTab() {
                   {o.paid_at && <p className="font-mono2 text-[10px] text-slate-600 mt-0.5">paid {new Date(o.paid_at).toLocaleString("cs-CZ")}</p>}
                   {o.gopay_payment_id && <p className="font-mono2 text-[10px] text-slate-600">gw {o.gopay_payment_id}</p>}
                   {o.teya_session_id && <p className="font-mono2 text-[10px] text-slate-600">teya {o.teya_session_id}</p>}
+                  {(o.payment_status === "created" || o.payment_status === "pending") && o.teya_session_id && (
+                    <button
+                      onClick={() => syncPayment(o.id)}
+                      data-testid={`sync-payment-${o.id.slice(0, 8)}`}
+                      className="mt-1 font-mono2 text-[11px] text-[#00F0FF] hover:underline"
+                    >
+                      sync payment
+                    </button>
+                  )}
                 </td>
                 <td className="px-4 py-3 font-mono2 text-[11px] text-slate-400" data-testid={`order-marketing-${o.id.slice(0, 8)}`}>
                   {(() => {

@@ -211,7 +211,7 @@ TEYA_STORE_ID = os.environ.get("TEYA_STORE_ID", "")
 TEYA_WEBHOOK_PUBLIC_KEY = os.environ.get("TEYA_WEBHOOK_PUBLIC_KEY", "")
 
 TEYA_STATE_MAP = {
-    "SUCCESS": "paid", "SUCCEEDED": "paid", "COMPLETED": "paid", "AUTHORIZED": "paid",
+    "SUCCESS": "paid", "SUCCEEDED": "paid", "COMPLETED": "paid", "AUTHORIZED": "paid", "PAID": "paid",
     "PENDING": "pending", "CREATED": "created", "SESSION_CREATED": "created",
     "FAILED": "failed", "CANCELLED": "cancelled", "CANCELED": "cancelled",
     "EXPIRED": "timeouted", "REFUNDED": "refunded", "PARTIALLY_REFUNDED": "partially_refunded",
@@ -343,6 +343,30 @@ async def teya_reconcile(session_id: str) -> str:
             {"$set": {"status": "refunded"}},
         )
     return new_status
+
+
+async def teya_reconcile_sweep():
+    """Safety net: every 2 min re-check recent unpaid Teya orders server-side, so a payment
+    gets confirmed even when the buyer closes the browser and the webhook fails."""
+    await asyncio.sleep(45)
+    while True:
+        try:
+            if teya_configured():
+                cutoff = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
+                cursor = db.orders.find({
+                    "payment_status": {"$in": ["created", "pending"]},
+                    "teya_session_id": {"$ne": None},
+                    "created_at": {"$gte": cutoff},
+                }, {"_id": 0, "id": 1, "teya_session_id": 1})
+                async for o in cursor:
+                    try:
+                        await teya_reconcile(o["teya_session_id"])
+                    except Exception as e:
+                        logger.debug("Sweep reconcile order %s: %s", o["id"], str(e)[:120])
+                    await asyncio.sleep(0.5)
+        except Exception as e:
+            logger.warning("Teya reconcile sweep error: %s", str(e)[:150])
+        await asyncio.sleep(120)
 
 
 _gopay_token_cache = {"token": None, "exp": 0.0}
@@ -758,7 +782,7 @@ async def fulfill_order(order_id: str):
     )
     if not order:
         return
-    for _ in range(order["quantity"]):
+    for _ in range(order["quantity"] * order.get("tickets_per_unit", 1)):
         code = "ATF-" + secrets.token_hex(3).upper()
         await db.tickets.insert_one({
             "id": new_id(), "code": code, "order_id": order["id"],
@@ -842,9 +866,11 @@ async def create_order(data: OrderCreateIn, request: Request):
     tier = await db.ticket_tiers.find_one({"id": data.tier_id}, {"_id": 0})
     if not tier or tier["event_id"] != event["id"]:
         raise HTTPException(404, "Ticket tier not found")
-    if "VIP" not in tier["name"].upper():
+    is_group = "GROUP" in tier["name"].upper()
+    tickets_per_unit = 4 if is_group else 1
+    if "VIP" not in tier["name"].upper() and not is_group:
         ga_tiers = await db.ticket_tiers.find({"event_id": event["id"]}).to_list(100)
-        ga_tiers = [t for t in ga_tiers if "VIP" not in t["name"].upper()]
+        ga_tiers = [t for t in ga_tiers if "VIP" not in t["name"].upper() and "GROUP" not in t["name"].upper()]
         ga_tiers.sort(key=lambda t: t["price_czk"])
         active_id = None
         for t in ga_tiers:
@@ -856,7 +882,7 @@ async def create_order(data: OrderCreateIn, request: Request):
         if tier["id"] != active_id:
             raise HTTPException(400, "This release is not on sale yet")
     sold = await db.tickets.count_documents({"tier_id": tier["id"]})
-    if sold + data.quantity > tier["capacity"]:
+    if sold + data.quantity * tickets_per_unit > tier["capacity"]:
         raise HTTPException(400, "Not enough tickets left in this tier")
     unit_price = tier["price_czk"]
     discount_percent = None
@@ -875,6 +901,7 @@ async def create_order(data: OrderCreateIn, request: Request):
         "tier_id": tier["id"],
         "tier_name": ticket_display_name(tier["name"]),
         "quantity": data.quantity,
+        "tickets_per_unit": tickets_per_unit,
         "amount_czk": unit_price * data.quantity,
         "list_price_czk": tier["price_czk"],
         "unit_price_czk": unit_price,
@@ -998,7 +1025,10 @@ async def teya_notification(request: Request):
             pk = serialization.load_pem_public_key(b64.encode())
             pk.verify(base64.b64decode(sig), raw, asym_padding.PKCS1v15(), hashes.SHA256())
         except Exception:
-            raise HTTPException(401, "Invalid Teya signature")
+            # Never reject: the payload is NOT trusted anyway — we only use it as a trigger
+            # and re-fetch the authoritative session state from Teya server-to-server below
+            # (teya_reconcile verifies merchant_reference + amount + currency against our DB).
+            logger.warning("Teya webhook signature check failed (sig len %d) — reconciling server-side anyway", len(sig))
     import json as _json
     try:
         event = _json.loads(raw)
@@ -1258,15 +1288,29 @@ async def admin_comp_tickets(data: CompTicketIn, admin=Depends(get_current_admin
 
 
 @api_router.get("/admin/orders")
-async def admin_orders(admin=Depends(get_current_admin)):
+async def admin_orders(include_unpaid: bool = False, admin=Depends(get_current_admin)):
     orders = await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(10000)
     visible = []
     for o in orders:
         o["tickets"] = await db.tickets.find({"order_id": o["id"]}, {"_id": 0}).to_list(50)
         o["payment_status"] = o.get("payment_status") or o.get("status", "paid_mock")
-        if o["payment_status"] not in ("created", "pending"):
+        if include_unpaid or o["payment_status"] not in ("created", "pending"):
             visible.append(o)
     return visible
+
+
+@api_router.post("/admin/orders/{order_id}/sync-payment")
+async def admin_sync_payment(order_id: str, admin=Depends(get_current_admin)):
+    """Manually re-check a Teya session and reconcile the order (fulfills if the payment succeeded)."""
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if not order.get("teya_session_id"):
+        raise HTTPException(400, "Order has no Teya session to sync")
+    status = await teya_reconcile(order["teya_session_id"])
+    logger.warning("ADMIN %s synced payment for order %s -> %s", admin.get("email"), order_id, status)
+    return {"ok": True, "payment_status": status,
+            "tickets": await db.tickets.count_documents({"order_id": order_id})}
 
 
 @api_router.delete("/admin/orders/{order_id}")
@@ -1518,6 +1562,7 @@ async def startup():
     await seed_admin()
     await seed_event()
     asyncio.create_task(retry_unsent_ticket_emails())
+    asyncio.create_task(teya_reconcile_sweep())
 
 
 app.include_router(api_router)

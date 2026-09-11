@@ -63,7 +63,8 @@ function PosterCarousel() {
 }
 
 function CheckoutModal({ tier, event, onClose }) {
-  const displayName = /vip/i.test(tier.name) ? "VIP Table Ticket" : "Standard Ticket";
+  const isGroup = /group/i.test(tier.name);
+  const displayName = /vip/i.test(tier.name) ? "VIP Table Ticket" : isGroup ? "Group of 4 — 4× Standard Ticket" : "Standard Ticket";
   const [step, setStep] = useState("form");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -193,21 +194,28 @@ function CheckoutModal({ tier, event, onClose }) {
                 <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">Phone</label>
                 <input data-testid="checkout-phone-input" required type="tel" className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+420 …" />
               </div>
-              <div>
-                <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">Quantity</label>
-                <select
-                  data-testid="checkout-quantity-select"
-                  className={inputCls}
-                  value={qty}
-                  onChange={(e) => setQty(Number(e.target.value))}
-                >
-                  {Array.from({ length: maxQty }).map((_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {i + 1} ticket{i > 0 ? "s" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {isGroup ? (
+                <div>
+                  <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">Quantity</label>
+                  <p className="font-mono2 text-sm text-slate-300 py-2.5" data-testid="checkout-group-note">1 group = 4 tickets</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">Quantity</label>
+                  <select
+                    data-testid="checkout-quantity-select"
+                    className={inputCls}
+                    value={qty}
+                    onChange={(e) => setQty(Number(e.target.value))}
+                  >
+                    {Array.from({ length: maxQty }).map((_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {i + 1} ticket{i > 0 ? "s" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="mt-6">
               <label className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-slate-400">Discount code</label>
@@ -267,7 +275,7 @@ function CheckoutModal({ tier, event, onClose }) {
             <h3 className="font-display font-extrabold text-xl uppercase mb-1">
               {displayName} — {czk(totalPrice)}
             </h3>
-            <p className="text-slate-400 text-sm mb-5">{qty} ticket{qty > 1 ? "s" : ""} · {email}</p>
+            <p className="text-slate-400 text-sm mb-5">{isGroup ? "1 group (4 tickets)" : `${qty} ticket${qty > 1 ? "s" : ""}`} · {email}</p>
             <div id="teya-checkout-container" data-testid="teya-checkout-container" className="bg-white rounded-xl overflow-hidden min-h-[320px]" />
             <p className="font-mono2 text-[10px] text-slate-600 mt-3 text-center">
               Payments are processed by Teya. Tickets with QR codes arrive by email right after the payment is confirmed.
@@ -282,8 +290,10 @@ function CheckoutModal({ tier, event, onClose }) {
 export default function Tickets({ tiers = [], event }) {
   const [selected, setSelected] = useState(null);
   const isAvailable = (t) => (t.sold || 0) < t.capacity;
-  const ga = [...tiers].filter((t) => !t.name.toUpperCase().includes("VIP")).sort((a, b) => a.price_czk - b.price_czk);
+  const ga = [...tiers].filter((t) => !t.name.toUpperCase().includes("VIP") && !t.name.toUpperCase().includes("GROUP")).sort((a, b) => a.price_czk - b.price_czk);
   const vipTiers = [...tiers].filter((t) => t.name.toUpperCase().includes("VIP")).sort((a, b) => a.price_czk - b.price_czk);
+  const groupTiers = [...tiers].filter((t) => t.name.toUpperCase().includes("GROUP")).sort((a, b) => a.price_czk - b.price_czk);
+  const group = groupTiers.find(isAvailable);
   const soldOutGA = ga.filter((t) => !isAvailable(t));
   const activeGA = ga.find(isAvailable);
   const nextGA = activeGA ? ga[ga.indexOf(activeGA) + 1] : null;
@@ -374,6 +384,38 @@ export default function Tickets({ tiers = [], event }) {
               <div className="border border-white/10 bg-[#0D0E15] rounded-3xl p-10 text-center" data-testid="ga-soldout-card">
                 <p className="font-display font-extrabold text-xl uppercase text-slate-400">All releases sold out</p>
                 <p className="text-slate-500 text-sm mt-2">Follow us for last-minute announcements.</p>
+              </div>
+            )}
+
+            {group && (
+              <div
+                data-testid={`ticket-tier-card-${group.id}`}
+                className="mt-5 border border-white/10 bg-[#0D0E15] rounded-3xl p-6 sm:p-8 hover:border-[#FF0055]/60 hover:-translate-y-1 transition-all duration-300"
+              >
+                <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#00F0FF] mb-3">Group of 4</p>
+                <p className="font-display font-black text-4xl sm:text-5xl mb-4" data-testid="group-price">{czk(group.price_czk)}</p>
+                <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600] mb-5" data-testid="group-per-person">
+                  4 × Standard Ticket · {czk(Math.round(group.price_czk / 4))} per person
+                </p>
+                <ul className="space-y-2.5 text-sm text-slate-300 mb-6" data-testid="group-perks-list">
+                  {[
+                    "4 full-festival tickets in one order",
+                    "Access to all 3 stages",
+                    "Standing and dance floor access",
+                    "Access to all public bars and rooftops",
+                  ].map((d) => (
+                    <li key={d} className="flex items-start gap-2.5">
+                      <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {d}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  data-testid={`buy-ticket-button-${group.id}`}
+                  onClick={() => setSelected(group)}
+                  className="w-full bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-base py-4 rounded-full transition-all duration-200 hover:shadow-[0_0_35px_rgba(255,106,0,0.35)] active:scale-[0.97] min-h-[56px]"
+                >
+                  Buy Group Ticket
+                </button>
               </div>
             )}
 
