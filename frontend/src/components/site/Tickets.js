@@ -399,13 +399,17 @@ export default function Tickets({ tiers = [], event }) {
                 </p>
                 <ul className="space-y-2.5 text-sm text-slate-300 mb-6" data-testid="group-perks-list">
                   {[
-                    "4 full-festival tickets in one order",
                     "Access to all 3 stages",
                     "Standing and dance floor access",
                     "Access to all public bars and rooftops",
                   ].map((d) => (
                     <li key={d} className="flex items-start gap-2.5">
                       <Check size={15} className="text-green-400 mt-0.5 shrink-0" /> {d}
+                    </li>
+                  ))}
+                  {["No access to VIP table areas", "No reserved table or guaranteed seating", "No bottle service"].map((d) => (
+                    <li key={d} className="flex items-start gap-2.5">
+                      <X size={15} className="text-[#FF0055] mt-0.5 shrink-0" /> {d}
                     </li>
                   ))}
                 </ul>
