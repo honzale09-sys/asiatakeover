@@ -1215,18 +1215,40 @@ async def scan_checkin(data: ScanIn, admin=Depends(get_current_admin)):
 @api_router.get("/admin/stats")
 async def admin_stats(admin=Depends(get_current_admin)):
     orders = await db.orders.find({}, {"_id": 0}).to_list(100000)
-    revenue = sum(o["amount_czk"] for o in orders)
     tickets_sold = await db.tickets.count_documents({})
     checked_in = await db.tickets.count_documents({"status": "used"})
     tiers = await db.ticket_tiers.find({}, {"_id": 0}).to_list(100)
+    tier_price = {t["id"]: t["price_czk"] for t in tiers}
+
+    paid_orders = [o for o in orders if (o.get("payment_status") or "paid_mock") in ("paid", "paid_mock")]
+    revenue = sum(o["amount_czk"] for o in paid_orders)
+    list_total = sum((o.get("list_price_czk") or o["amount_czk"]) * o["quantity"] for o in paid_orders)
+    promo_discount = sum(
+        max(0, (o.get("list_price_czk") or 0) * o["quantity"] - o["amount_czk"])
+        for o in paid_orders if o.get("promo_code")
+    )
+    comps = [o for o in paid_orders if o.get("comp")]
+    comp_tickets = sum(o["quantity"] * o.get("tickets_per_unit", 1) for o in comps)
+    comp_nominal = sum(o["quantity"] * o.get("tickets_per_unit", 1) * tier_price.get(o["tier_id"], 0) for o in comps)
+
+    revenue_by_tier = {}
+    for o in paid_orders:
+        revenue_by_tier[o["tier_id"]] = revenue_by_tier.get(o["tier_id"], 0) + o["amount_czk"]
+
     per_tier = []
     for t in tiers:
         sold = await db.tickets.count_documents({"tier_id": t["id"]})
         per_tier.append({"name": t["name"], "sold": sold, "capacity": t["capacity"],
-                         "revenue": sold * t["price_czk"]})
+                         "revenue": revenue_by_tier.get(t["id"], 0)})
     recent_scans = await db.tickets.find({"status": "used"}, {"_id": 0}).sort("checked_in_at", -1).to_list(20)
-    return {"revenue_czk": revenue, "orders": len(orders), "tickets_sold": tickets_sold,
-            "checked_in": checked_in, "per_tier": per_tier, "recent_scans": recent_scans}
+    return {"revenue_czk": revenue, "orders": len(paid_orders), "tickets_sold": tickets_sold,
+            "checked_in": checked_in, "per_tier": per_tier, "recent_scans": recent_scans,
+            "revenue_check": {
+                "list_total_czk": list_total,
+                "comp_tickets": comp_tickets,
+                "comp_nominal_czk": comp_nominal,
+                "promo_discount_czk": promo_discount,
+            }}
 
 
 class CompTicketIn(BaseModel):

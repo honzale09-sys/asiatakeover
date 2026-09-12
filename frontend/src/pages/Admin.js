@@ -35,6 +35,29 @@ function OverviewTab() {
         <StatCard label="Checked In" value={stats.checked_in} testid="stat-checked-in" />
         <StatCard label="Orders" value={stats.orders} testid="stat-orders" />
       </div>
+      {stats.revenue_check && (
+        <div className={cardCls} data-testid="revenue-check-card">
+          <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-slate-400 mb-6">Revenue check (Teya reconciliation)</p>
+          <div className="space-y-3 text-sm max-w-md">
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-400">Sold × tier price (list)</span>
+              <span className="font-mono2" data-testid="rc-list">{czk(stats.revenue_check.list_total_czk + stats.revenue_check.comp_nominal_czk)}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-400">Comp tickets ({stats.revenue_check.comp_tickets} pcs, free)</span>
+              <span className="font-mono2 text-[#FFE600]" data-testid="rc-comps">−{czk(stats.revenue_check.comp_nominal_czk)}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-400">Promo discounts</span>
+              <span className="font-mono2 text-[#FFE600]" data-testid="rc-promo">−{czk(stats.revenue_check.promo_discount_czk)}</span>
+            </div>
+            <div className="flex justify-between gap-4 pt-3 border-t border-white/10">
+              <span className="text-white font-bold uppercase text-xs tracking-wider">= Actually paid (matches Teya)</span>
+              <span className="font-mono2 font-bold text-green-400" data-testid="rc-paid">{czk(stats.revenue_czk)}</span>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={cardCls}>
         <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-slate-400 mb-6">Sales per tier</p>
         <div className="h-64" data-testid="sales-chart">
