@@ -142,6 +142,26 @@ async def logout(response: Response):
     return {"ok": True}
 
 
+@api_router.post("/auth/refresh")
+async def refresh_tokens(request: Request, response: Response):
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(401, "No refresh token")
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(401, "Invalid token type")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Refresh token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid refresh token")
+    user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(401, "User not found")
+    set_auth_cookies(response, create_access_token(user["id"], user["email"]), create_refresh_token(user["id"]))
+    return {"ok": True}
+
+
 @api_router.get("/auth/me")
 async def me(admin=Depends(get_current_admin)):
     return admin
@@ -1215,8 +1235,8 @@ async def scan_checkin(data: ScanIn, admin=Depends(get_current_admin)):
 @api_router.get("/admin/stats")
 async def admin_stats(admin=Depends(get_current_admin)):
     orders = await db.orders.find({}, {"_id": 0}).to_list(100000)
-    tickets_sold = await db.tickets.count_documents({})
-    checked_in = await db.tickets.count_documents({"status": "used"})
+    tickets_sold = await db.tickets.count_documents({"guest_list": {"$ne": True}})
+    checked_in = await db.tickets.count_documents({"status": "used", "guest_list": {"$ne": True}})
     tiers = await db.ticket_tiers.find({}, {"_id": 0}).to_list(100)
     tier_price = {t["id"]: t["price_czk"] for t in tiers}
 
@@ -1227,7 +1247,7 @@ async def admin_stats(admin=Depends(get_current_admin)):
         max(0, (o.get("list_price_czk") or 0) * o["quantity"] - o["amount_czk"])
         for o in paid_orders if o.get("promo_code")
     )
-    comps = [o for o in paid_orders if o.get("comp")]
+    comps = [o for o in paid_orders if o.get("comp") and not o.get("guest_list")]
     comp_tickets = sum(o["quantity"] * o.get("tickets_per_unit", 1) for o in comps)
     comp_nominal = sum(o["quantity"] * o.get("tickets_per_unit", 1) * tier_price.get(o["tier_id"], 0) for o in comps)
 
@@ -1241,14 +1261,69 @@ async def admin_stats(admin=Depends(get_current_admin)):
         per_tier.append({"name": t["name"], "sold": sold, "capacity": t["capacity"],
                          "revenue": revenue_by_tier.get(t["id"], 0)})
     recent_scans = await db.tickets.find({"status": "used"}, {"_id": 0}).sort("checked_in_at", -1).to_list(20)
+
+    std_sold = await db.tickets.count_documents({"tier_name": "Standard Ticket", "guest_list": {"$ne": True}})
+    std_checked = await db.tickets.count_documents({"tier_name": "Standard Ticket", "guest_list": {"$ne": True}, "status": "used"})
+    vip_sold = await db.tickets.count_documents({"tier_name": "VIP Table Ticket"})
+    vip_checked = await db.tickets.count_documents({"tier_name": "VIP Table Ticket", "status": "used"})
+    guest_sent = await db.tickets.count_documents({"guest_list": True})
+    guest_checked = await db.tickets.count_documents({"guest_list": True, "status": "used"})
+    vip_guest_list = await db.tickets.find({"guest_list": True}, {"_id": 0, "code": 1, "buyer_email": 1, "created_at": 1, "status": 1}).sort("created_at", -1).to_list(500)
+
     return {"revenue_czk": revenue, "orders": len(paid_orders), "tickets_sold": tickets_sold,
             "checked_in": checked_in, "per_tier": per_tier, "recent_scans": recent_scans,
+            "categories": {
+                "standard": {"sold": std_sold, "checked_in": std_checked},
+                "vip": {"sold": vip_sold, "checked_in": vip_checked},
+                "vip_guest_list": {"sent": guest_sent, "checked_in": guest_checked},
+            },
+            "vip_guest_list": vip_guest_list,
             "revenue_check": {
                 "list_total_czk": list_total,
                 "comp_tickets": comp_tickets,
                 "comp_nominal_czk": comp_nominal,
                 "promo_discount_czk": promo_discount,
             }}
+
+
+class VipGuestIn(BaseModel):
+    email: EmailStr
+
+
+@api_router.post("/admin/vip-guest-list")
+async def admin_vip_guest_list(data: VipGuestIn, admin=Depends(get_current_admin)):
+    """Issue a free VIP Guest List ticket: same VIP access, emailed like regular tickets,
+    excluded from revenue and tickets-sold stats. QR is single-use like any ticket."""
+    event = await db.events.find_one({"active": True}, {"_id": 0})
+    if not event:
+        raise HTTPException(404, "No active event")
+    email = data.email.lower()
+    now = utcnow().isoformat()
+    order = {
+        "id": new_id(), "created_at": now, "updated_at": now,
+        "event_id": event["id"], "event_name": event["name"],
+        "tier_id": "VIP_GUEST_LIST", "tier_name": "VIP Guest List",
+        "quantity": 1, "tickets_per_unit": 1, "amount_czk": 0, "list_price_czk": 0,
+        "unit_price_czk": 0, "promo_code": None, "discount_percent": None,
+        "currency": "CZK", "buyer_name": "VIP Guest", "buyer_email": email, "buyer_phone": "",
+        "payment_status": "paid", "paid_at": now, "fulfillment_status": "fulfilled",
+        "comp": True, "guest_list": True, "created_by": admin.get("email"),
+        "marketing_consent": False, "attribution": None, "gopay_payment_id": None,
+    }
+    await db.orders.insert_one(order)
+    code = "ATF-" + secrets.token_hex(3).upper()
+    await db.tickets.insert_one({
+        "id": new_id(), "code": code, "order_id": order["id"],
+        "event_id": event["id"], "event_name": event["name"],
+        "tier_id": "VIP_GUEST_LIST", "tier_name": "VIP Guest List",
+        "holder_name": "VIP Guest", "buyer_email": email,
+        "guest_list": True,
+        "status": "valid", "created_at": now,
+        "checked_in_at": None, "checked_in_by": None,
+    })
+    asyncio.create_task(send_ticket_email_with_retry(order["id"]))
+    logger.warning("ADMIN %s sent VIP guest list ticket %s to %s", admin.get("email"), code, email)
+    return {"ok": True, "code": code, "email": email}
 
 
 class CompTicketIn(BaseModel):

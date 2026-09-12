@@ -33,7 +33,18 @@ export default function Scanner() {
   const scannerRef = useRef(null);
 
   useEffect(() => {
-    api.get("/auth/me").then((r) => setUser(r.data)).catch(() => setUser(false));
+    // Session check with one silent refresh — keeps the scanner logged in through long events
+    api.get("/auth/me").then((r) => setUser(r.data)).catch(async (e) => {
+      if (e?.response?.status === 401) {
+        try {
+          await api.post("/auth/refresh");
+          const r = await api.get("/auth/me");
+          setUser(r.data);
+          return;
+        } catch {}
+      }
+      setUser(false);
+    });
   }, []);
 
   useEffect(
@@ -43,11 +54,24 @@ export default function Scanner() {
     []
   );
 
+  // Transparently refresh the session once on 401 so door staff never get logged out mid-scan.
+  const withRefresh = useCallback(async (fn) => {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e?.response?.status === 401) {
+        await api.post("/auth/refresh");
+        return await fn();
+      }
+      throw e;
+    }
+  }, []);
+
   const handleCode = useCallback(async (raw) => {
     if (processingRef.current || !raw) return;
     processingRef.current = true;
     try {
-      const r = await api.post("/scan/lookup", { code: raw });
+      const r = await withRefresh(() => api.post("/scan/lookup", { code: raw }));
       setResult(r.data);
       const ok = r.data.result === "valid";
       beep(ok);
@@ -63,7 +87,7 @@ export default function Scanner() {
         processingRef.current = false;
       }, 1200);
     }
-  }, []);
+  }, [withRefresh]);
 
   useEffect(() => {
     if (!result) return;
@@ -74,7 +98,7 @@ export default function Scanner() {
   const checkin = async () => {
     if (!result?.ticket) return;
     try {
-      const r = await api.post("/scan/checkin", { code: result.ticket.code });
+      const r = await withRefresh(() => api.post("/scan/checkin", { code: result.ticket.code }));
       if (r.data.result === "valid") {
         setResult({ ...r.data, result: "admitted" });
         beep(true);
@@ -126,13 +150,22 @@ export default function Scanner() {
     );
 
   const t = result?.ticket;
-  const isVip = t && /vip/i.test(t.tier_name || "");
+  const isGuest = t && /guest\s*list/i.test(t.tier_name || "");
+  const isVip = t && /vip/i.test(t.tier_name || "") && !isGuest;
   const vipBadge = isVip && (
     <span
       data-testid="scan-vip-badge"
       className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#C9A227] bg-[#C9A227]/15 px-4 py-1.5 font-display font-black uppercase text-sm tracking-wider text-[#C9A227] shadow-[0_0_25px_rgba(201,162,39,0.35)]"
     >
       🏆 VIP Table
+    </span>
+  );
+  const guestBadge = isGuest && (
+    <span
+      data-testid="scan-guest-badge"
+      className="mt-3 inline-flex items-center gap-2 rounded-2xl border-2 border-[#C9A227] bg-[#C9A227] px-6 py-3 font-display font-black uppercase text-xl sm:text-2xl tracking-wider text-black shadow-[0_0_40px_rgba(201,162,39,0.55)]"
+    >
+      🏆 VIP Guest List
     </span>
   );
 
@@ -230,6 +263,7 @@ export default function Scanner() {
                 <p className="text-slate-300 text-sm mt-1">{t.holder_name}</p>
                 <p className="font-mono2 text-xs text-[#00F0FF] mt-1 uppercase tracking-wider">{t.tier_name}</p>
                 {vipBadge}
+                {guestBadge}
                 <button
                   onClick={checkin}
                   data-testid="checkin-button"
@@ -242,10 +276,11 @@ export default function Scanner() {
             {result && result.result === "admitted" && t && (
               <div data-testid="scan-result-admitted">
                 <CheckCircle2 size={44} className="text-emerald-400 mb-4" />
-                <p className="font-display font-black text-3xl uppercase text-emerald-400 mb-3">Admitted</p>
+                <p className="font-display font-black text-3xl uppercase text-emerald-400 mb-3">Admitted — Checked In</p>
                 <p className="font-mono2 text-sm text-white">{t.code}</p>
                 <p className="text-slate-300 text-sm mt-1">{t.holder_name} · {t.tier_name}</p>
                 {vipBadge}
+                {guestBadge}
                 <p className="font-mono2 text-xs text-slate-400 mt-2">Ticket is now marked as used. Scan the next guest.</p>
               </div>
             )}
@@ -264,6 +299,7 @@ export default function Scanner() {
                 <p className="font-mono2 text-sm text-white">{t.code}</p>
                 <p className="text-slate-300 text-sm mt-1">{t.holder_name} · {t.tier_name}</p>
                 {vipBadge}
+                {guestBadge}
                 <p className="font-mono2 text-xs text-slate-400 mt-2">
                   Checked in at {t.checked_in_at ? new Date(t.checked_in_at).toLocaleString("cs-CZ") : "—"}
                   {t.checked_in_by ? ` by ${t.checked_in_by}` : ""}

@@ -21,11 +21,77 @@ function StatCard({ label, value, testid }) {
   );
 }
 
+function VipGuestListCard({ stats, onSent }) {
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const send = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setSending(true);
+    try {
+      const r = await api.post("/admin/vip-guest-list", { email: email.trim() });
+      toast.success(`VIP Guest List ticket ${r.data.code} sent to ${r.data.email}`);
+      setEmail("");
+      onSent();
+    } catch (err) {
+      toast.error(formatError(err));
+    } finally {
+      setSending(false);
+    }
+  };
+  return (
+    <div className={cardCls} data-testid="vip-guest-list-card">
+      <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-[#C9A227] mb-2">VIP Guest List</p>
+      <p className="font-display font-black text-2xl sm:text-3xl text-[#C9A227] mb-6" data-testid="guest-stats">
+        {stats?.categories?.vip_guest_list?.sent ?? 0} <span className="text-sm text-slate-500 font-bold">SENT</span>
+        <span className="text-slate-600 mx-2">/</span>
+        {stats?.categories?.vip_guest_list?.checked_in ?? 0} <span className="text-sm text-slate-500 font-bold">CHECKED IN</span>
+      </p>
+      <form onSubmit={send} className="flex gap-2 mb-6">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Enter guest email"
+          data-testid="guest-email-input"
+          className={inputCls}
+        />
+        <button
+          type="submit"
+          disabled={sending}
+          data-testid="guest-send-button"
+          className="whitespace-nowrap bg-[#C9A227] hover:bg-[#dbb53a] disabled:opacity-50 text-black font-display font-bold uppercase text-xs px-5 rounded-lg transition-colors"
+        >
+          {sending ? "Sending…" : "Send ticket"}
+        </button>
+      </form>
+      <div className="space-y-2 max-h-72 overflow-y-auto" data-testid="guest-list">
+        {(stats?.vip_guest_list || []).map((g) => (
+          <div key={g.code} className="flex flex-wrap items-center justify-between gap-2 border border-white/5 rounded-lg px-3 py-2.5 text-xs" data-testid={`guest-row-${g.code}`}>
+            <div className="min-w-0">
+              <p className="text-slate-200 truncate">{g.buyer_email}</p>
+              <p className="font-mono2 text-[10px] text-slate-500">{g.code} · {g.created_at?.slice(0, 16).replace("T", " ")}</p>
+            </div>
+            {g.status === "used" ? (
+              <span className="font-mono2 text-[10px] font-bold uppercase tracking-[0.15em] text-green-400 border border-green-400/30 rounded-full px-2.5 py-1">Checked In</span>
+            ) : (
+              <span className="font-mono2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#C9A227] border border-[#C9A227]/30 rounded-full px-2.5 py-1">Sent</span>
+            )}
+          </div>
+        ))}
+        {(stats?.vip_guest_list || []).length === 0 && (
+          <p className="text-slate-600 text-xs font-mono2">No guest tickets sent yet</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OverviewTab() {
   const [stats, setStats] = useState(null);
-  useEffect(() => {
-    api.get("/admin/stats").then((r) => setStats(r.data)).catch((e) => toast.error(formatError(e)));
-  }, []);
+  const load = () => api.get("/admin/stats").then((r) => setStats(r.data)).catch((e) => toast.error(formatError(e)));
+  useEffect(() => { load(); }, []);
   if (!stats) return <p className="font-mono2 text-sm text-slate-500">Loading stats…</p>;
   return (
     <div className="space-y-8" data-testid="admin-overview">
@@ -34,6 +100,25 @@ function OverviewTab() {
         <StatCard label="Tickets Sold" value={stats.tickets_sold} testid="stat-tickets-sold" />
         <StatCard label="Checked In" value={stats.checked_in} testid="stat-checked-in" />
         <StatCard label="Orders" value={stats.orders} testid="stat-orders" />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3" data-testid="category-cards">
+        <div className={cardCls} data-testid="cat-standard">
+          <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-[#00F0FF] mb-2">Standard</p>
+          <p className="font-display font-black text-xl sm:text-2xl whitespace-nowrap">
+            {stats.categories?.standard?.sold ?? 0} <span className="text-xs text-slate-500 font-bold">SOLD</span>
+            <span className="text-slate-600 mx-1.5">/</span>
+            <span className="text-green-400">{stats.categories?.standard?.checked_in ?? 0}</span> <span className="text-xs text-slate-500 font-bold">CHECKED IN</span>
+          </p>
+        </div>
+        <div className={cardCls} data-testid="cat-vip">
+          <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-[#C9A227] mb-2">VIP</p>
+          <p className="font-display font-black text-xl sm:text-2xl whitespace-nowrap">
+            {stats.categories?.vip?.sold ?? 0} <span className="text-xs text-slate-500 font-bold">SOLD</span>
+            <span className="text-slate-600 mx-1.5">/</span>
+            <span className="text-green-400">{stats.categories?.vip?.checked_in ?? 0}</span> <span className="text-xs text-slate-500 font-bold">CHECKED IN</span>
+          </p>
+        </div>
+        <VipGuestListCard stats={stats} onSent={load} />
       </div>
       {stats.revenue_check && (
         <div className={cardCls} data-testid="revenue-check-card">
@@ -210,12 +295,20 @@ function OrdersTab() {
                   ))}
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`font-mono2 text-[11px] uppercase tracking-wider ${
-                    o.payment_status === "paid" || o.payment_status === "paid_mock" ? "text-emerald-400"
-                    : o.payment_status === "created" || o.payment_status === "pending" ? "text-[#FFE600]"
-                    : o.payment_status === "refunded" || o.payment_status === "partially_refunded" ? "text-[#FF6A00]"
-                    : "text-[#FF0055]"
-                  }`} data-testid={`order-status-${o.id.slice(0, 8)}`}>{o.payment_status}</span>
+                  {o.guest_list ? (
+                    <span className={`font-mono2 text-[11px] font-bold uppercase tracking-wider ${
+                      o.tickets?.[0]?.status === "used" ? "text-emerald-400" : "text-[#C9A227]"
+                    }`} data-testid={`order-status-${o.id.slice(0, 8)}`}>
+                      {o.tickets?.[0]?.status === "used" ? "Checked In" : "Sent"}
+                    </span>
+                  ) : (
+                    <span className={`font-mono2 text-[11px] uppercase tracking-wider ${
+                      o.payment_status === "paid" || o.payment_status === "paid_mock" ? "text-emerald-400"
+                      : o.payment_status === "created" || o.payment_status === "pending" ? "text-[#FFE600]"
+                      : o.payment_status === "refunded" || o.payment_status === "partially_refunded" ? "text-[#FF6A00]"
+                      : "text-[#FF0055]"
+                    }`} data-testid={`order-status-${o.id.slice(0, 8)}`}>{o.payment_status}</span>
+                  )}
                   {o.paid_at && <p className="font-mono2 text-[10px] text-slate-600 mt-0.5">paid {new Date(o.paid_at).toLocaleString("cs-CZ")}</p>}
                   {o.gopay_payment_id && <p className="font-mono2 text-[10px] text-slate-600">gw {o.gopay_payment_id}</p>}
                   {o.teya_session_id && <p className="font-mono2 text-[10px] text-slate-600">teya {o.teya_session_id}</p>}
