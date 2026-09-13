@@ -78,7 +78,6 @@ export default function ReservePage() {
                     <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">{t("reserve.floor")}</label>
                     <select data-testid="reserve-floor-select" className={inputCls} value={form.floor} onChange={(e) => setForm({ ...form, floor: e.target.value })}>
                       <option>Seoul Floor (7th)</option>
-                      <option>Mainstream Floor (6th)</option>
                       <option>Saigon Floor (5th)</option>
                     </select>
                   </div>

@@ -188,7 +188,11 @@ async def get_site():
         raise HTTPException(404, "No active event")
     tiers = await db.ticket_tiers.find({"event_id": event["id"]}, {"_id": 0}).to_list(50)
     for t in tiers:
-        t["sold"] = await db.tickets.count_documents({"tier_id": t["id"]})
+        if "GOLD" in t["name"].upper():
+            # gold tier capacity counts TABLES; one paid order = one table
+            t["sold"] = await db.orders.count_documents({"tier_id": t["id"], "payment_status": "paid"})
+        else:
+            t["sold"] = await db.tickets.count_documents({"tier_id": t["id"]})
     content = await db.content.find_one({"key": "site"}, {"_id": 0}) or {}
     return {"event": event, "tiers": tiers, "content": content}
 
@@ -250,7 +254,10 @@ GOPAY_STATE_MAP = {
 
 
 def ticket_display_name(tier_name: str) -> str:
-    return "VIP Table Ticket" if "VIP" in (tier_name or "").upper() else "Standard Ticket"
+    n = (tier_name or "").upper()
+    if "GOLD" in n:
+        return "VIP GOLD"
+    return "VIP Table Ticket" if "VIP" in n else "Standard Ticket"
 
 
 def gopay_configured() -> bool:
@@ -787,6 +794,185 @@ async def qr_png(code: str):
     return Response(content=buf.getvalue(), media_type="image/png")
 
 
+# ---------------- ambassadors admin ----------------
+
+class AmbassadorIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    instagram: str = Field(default="", max_length=120)
+    email: EmailStr
+    code: Optional[str] = Field(default=None, max_length=24)
+
+
+@api_router.get("/admin/ambassadors")
+async def admin_ambassadors_list(admin=Depends(get_current_admin)):
+    ambs = await db.ambassadors.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [await ambassador_public_state(a) for a in ambs]
+
+
+@api_router.post("/admin/ambassadors")
+async def admin_ambassador_create(data: AmbassadorIn, admin=Depends(get_current_admin)):
+    code = (data.code or "").strip().upper() or ("AMB-" + secrets.token_hex(3).upper())
+    if not re.fullmatch(r"[A-Z0-9-]{3,24}", code):
+        raise HTTPException(400, "Code must be 3–24 chars: letters, numbers, dashes")
+    if await db.ambassadors.find_one({"code": code}) or await db.promo_codes.find_one({"code": code}):
+        raise HTTPException(409, "This code is already taken")
+    now = utcnow().isoformat()
+    doc = {
+        "id": new_id(), "name": data.name.strip(), "instagram": data.instagram.strip(),
+        "email": data.email.lower(), "code": code,
+        "stories_shared": 0, "active": True,
+        "created_at": now, "activated_at": now,
+        "reward_standard": None, "reward_vip": None, "fifty": None,
+    }
+    await db.ambassadors.insert_one(doc)
+    logger.warning("ADMIN %s created ambassador %s (%s)", admin.get("email"), doc["name"], code)
+    return await ambassador_public_state(doc)
+
+
+class AmbassadorEditIn(BaseModel):
+    name: Optional[str] = None
+    instagram: Optional[str] = None
+    email: Optional[EmailStr] = None
+    active: Optional[bool] = None
+
+
+@api_router.put("/admin/ambassadors/{amb_id}")
+async def admin_ambassador_edit(amb_id: str, data: AmbassadorEditIn, admin=Depends(get_current_admin)):
+    amb = await db.ambassadors.find_one({"id": amb_id})
+    if not amb:
+        raise HTTPException(404, "Ambassador not found")
+    upd = {k: v for k, v in data.model_dump(exclude_none=True).items()}
+    if "email" in upd:
+        upd["email"] = upd["email"].lower()
+    if "name" in upd:
+        upd["name"] = upd["name"].strip()
+    if not upd:
+        raise HTTPException(400, "Nothing to update")
+    await db.ambassadors.update_one({"id": amb_id}, {"$set": upd})
+    logger.warning("ADMIN %s edited ambassador %s: %s", admin.get("email"), amb["name"], list(upd))
+    return await ambassador_public_state(await db.ambassadors.find_one({"id": amb_id}, {"_id": 0}))
+
+
+@api_router.post("/admin/ambassadors/{amb_id}/stories")
+async def admin_ambassador_stories(amb_id: str, data: dict, admin=Depends(get_current_admin)):
+    delta = int(data.get("delta", 0))
+    if delta not in (1, -1):
+        raise HTTPException(400, "delta must be +1 or -1")
+    amb = await db.ambassadors.find_one({"id": amb_id})
+    if not amb:
+        raise HTTPException(404, "Ambassador not found")
+    new_val = min(8, max(0, amb.get("stories_shared", 0) + delta))
+    await db.ambassadors.update_one({"id": amb_id}, {"$set": {"stories_shared": new_val}})
+    return await ambassador_public_state(await db.ambassadors.find_one({"id": amb_id}, {"_id": 0}))
+
+
+async def _issue_ambassador_reward(amb: dict, kind: str):
+    """kind: 'standard' | 'vip' — creates 0 Kč reward order + ticket + email."""
+    event = await db.events.find_one({"active": True}, {"_id": 0})
+    tier_name = "AMBASSADOR VIP" if kind == "vip" else "AMBASSADOR STANDARD"
+    now = utcnow().isoformat()
+    order = {
+        "id": new_id(), "created_at": now, "updated_at": now,
+        "event_id": event["id"], "event_name": event["name"],
+        "tier_id": "AMBASSADOR_REWARD", "tier_name": tier_name,
+        "quantity": 1, "tickets_per_unit": 1, "amount_czk": 0, "list_price_czk": 0,
+        "unit_price_czk": 0, "promo_code": None, "discount_percent": None,
+        "currency": "CZK", "buyer_name": amb["name"], "buyer_email": amb["email"], "buyer_phone": "",
+        "payment_status": "paid", "paid_at": now, "fulfillment_status": "fulfilled",
+        "comp": True, "reward": True, "ambassador_id": amb["id"], "created_by": "ambassador-program",
+        "marketing_consent": False, "attribution": None, "gopay_payment_id": None,
+    }
+    await db.orders.insert_one(order)
+    code = "ATF-" + secrets.token_hex(3).upper()
+    await db.tickets.insert_one({
+        "id": new_id(), "code": code, "order_id": order["id"],
+        "event_id": event["id"], "event_name": event["name"],
+        "tier_id": "AMBASSADOR_REWARD", "tier_name": tier_name,
+        "holder_name": amb["name"], "buyer_email": amb["email"],
+        "status": "valid", "created_at": now,
+        "checked_in_at": None, "checked_in_by": None,
+    })
+    order_id = order["id"]
+    asyncio.create_task(send_ticket_email_with_retry(order["id"]))
+    logger.warning("Ambassador reward %s issued to %s (%s) ticket %s", kind, amb["name"], amb["email"], code)
+    return {"code": code, "order_id": order_id}
+
+
+@api_router.post("/admin/ambassadors/{amb_id}/send-reward")
+async def admin_ambassador_send_reward(amb_id: str, data: dict, admin=Depends(get_current_admin)):
+    amb = await db.ambassadors.find_one({"id": amb_id})
+    if not amb:
+        raise HTTPException(404, "Ambassador not found")
+    state = await ambassador_public_state({k: v for k, v in amb.items() if k != "_id"})
+    kind = data.get("type")
+    if kind == "standard":
+        if not state["std_eligible"]:
+            raise HTTPException(400, "Standard reward not eligible (needs 3 paid sales, not yet sent)")
+        reward = await _issue_ambassador_reward(amb, "standard")
+        await db.ambassadors.update_one({"id": amb_id}, {"$set": {
+            "reward_standard": {"sent": True, "at": utcnow().isoformat(), "ticket_code": reward["code"],
+                                "order_id": reward["order_id"], "by": admin.get("email")}}})
+    elif kind == "vip":
+        if not state["vip_eligible"]:
+            raise HTTPException(400, "VIP reward not eligible (needs 5 paid sales, not yet sent)")
+        if (amb.get("reward_standard") or {}).get("sent"):
+            raise HTTPException(400, "Standard reward already sent — use Upgrade to VIP instead")
+        reward = await _issue_ambassador_reward(amb, "vip")
+        await db.ambassadors.update_one({"id": amb_id}, {"$set": {
+            "reward_vip": {"sent": True, "at": utcnow().isoformat(), "ticket_code": reward["code"],
+                           "order_id": reward["order_id"], "by": admin.get("email")}}})
+    else:
+        raise HTTPException(400, "type must be 'standard' or 'vip'")
+    logger.warning("ADMIN %s sent %s reward to ambassador %s", admin.get("email"), kind, amb["name"])
+    return await ambassador_public_state(await db.ambassadors.find_one({"id": amb_id}, {"_id": 0}))
+
+
+@api_router.post("/admin/ambassadors/{amb_id}/upgrade-reward")
+async def admin_ambassador_upgrade_reward(amb_id: str, admin=Depends(get_current_admin)):
+    amb = await db.ambassadors.find_one({"id": amb_id})
+    if not amb:
+        raise HTTPException(404, "Ambassador not found")
+    state = await ambassador_public_state({k: v for k, v in amb.items() if k != "_id"})
+    if not state["can_upgrade"]:
+        raise HTTPException(400, "Upgrade not available (needs standard sent + 5 paid sales, not yet VIP)")
+    std = amb["reward_standard"]
+    await db.tickets.update_one({"code": std["ticket_code"]}, {"$set": {"tier_name": "AMBASSADOR VIP"}})
+    if std.get("order_id"):
+        await db.orders.update_one({"id": std["order_id"]}, {"$set": {"tier_name": "AMBASSADOR VIP"}})
+    await db.ambassadors.update_one({"id": amb_id}, {"$set": {
+        "reward_vip": {"sent": True, "at": utcnow().isoformat(), "ticket_code": std["ticket_code"],
+                       "upgraded": True, "by": admin.get("email")}}})
+    logger.warning("ADMIN %s upgraded ambassador %s reward ticket %s to VIP", admin.get("email"), amb["name"], std["ticket_code"])
+    return await ambassador_public_state(await db.ambassadors.find_one({"id": amb_id}, {"_id": 0}))
+
+
+@api_router.post("/admin/ambassadors/{amb_id}/fifty-code")
+async def admin_ambassador_fifty_code(amb_id: str, admin=Depends(get_current_admin)):
+    amb = await db.ambassadors.find_one({"id": amb_id})
+    if not amb:
+        raise HTTPException(404, "Ambassador not found")
+    state = await ambassador_public_state({k: v for k, v in amb.items() if k != "_id"})
+    if not state["fifty_eligible"]:
+        raise HTTPException(400, "50% code requires 8/8 stories, fewer than 3 paid sales, within 14 days of activation, and no active code")
+    code = "ATF50-" + secrets.token_hex(3).upper()
+    await db.ambassadors.update_one({"id": amb_id}, {"$set": {
+        "fifty": {"code": code, "redeemed": False, "created_at": utcnow().isoformat(), "by": admin.get("email")}}})
+    logger.warning("ADMIN %s created 50%% code %s for ambassador %s", admin.get("email"), code, amb["name"])
+    return await ambassador_public_state(await db.ambassadors.find_one({"id": amb_id}, {"_id": 0}))
+
+
+@api_router.get("/admin/ambassadors/{amb_id}/qr.png")
+async def admin_ambassador_qr(amb_id: str, admin=Depends(get_current_admin)):
+    amb = await db.ambassadors.find_one({"id": amb_id})
+    if not amb:
+        raise HTTPException(404, "Ambassador not found")
+    img = qrcode.make(f"{SITE_URL}/tickets?ref={amb['code']}", box_size=10, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png",
+                    headers={"Content-Disposition": f"attachment; filename=referral-{amb['code']}.png"})
+
+
 # ---------------- fulfillment & reconciliation ----------------
 
 async def fulfill_order(order_id: str):
@@ -802,6 +988,11 @@ async def fulfill_order(order_id: str):
     )
     if not order:
         return
+    if order.get("promo_code"):
+        await db.ambassadors.update_one(
+            {"fifty.code": order["promo_code"]},
+            {"$set": {"fifty.redeemed": True, "fifty.redeemed_at": utcnow().isoformat()}},
+        )
     for _ in range(order["quantity"] * order.get("tickets_per_unit", 1)):
         code = "ATF-" + secrets.token_hex(3).upper()
         await db.tickets.insert_one({
@@ -853,6 +1044,41 @@ async def reconcile_payment(payment_id: str) -> str:
     return new_status
 
 
+# ---------------- ambassadors ----------------
+
+AMB_DISCOUNT_CZK = 50
+AMB_MAX_USES = 10
+FIFTY_WINDOW_DAYS = 14
+
+
+async def ambassador_sales(code: str) -> int:
+    """Paid, non-refunded tickets bought with this ambassador code (each ticket = 1 sale)."""
+    orders = await db.orders.find(
+        {"promo_code": code.strip().upper(), "payment_status": "paid"},
+        {"_id": 0, "quantity": 1, "tickets_per_unit": 1},
+    ).to_list(100000)
+    return sum(o["quantity"] * o.get("tickets_per_unit", 1) for o in orders)
+
+
+async def ambassador_public_state(amb: dict) -> dict:
+    sales = await ambassador_sales(amb["code"])
+    std = amb.get("reward_standard") or {}
+    vip = amb.get("reward_vip") or {}
+    fifty = amb.get("fifty") or {}
+    activated = datetime.fromisoformat(amb.get("activated_at") or amb["created_at"])
+    fifty_window_open = datetime.now(timezone.utc) <= activated + timedelta(days=FIFTY_WINDOW_DAYS)
+    return {
+        **{k: v for k, v in amb.items() if k != "_id"},
+        "sales": sales,
+        "uses_left": max(0, AMB_MAX_USES - sales),
+        "std_eligible": sales >= 3 and not std.get("sent"),
+        "vip_eligible": sales >= 5 and not vip.get("sent"),
+        "can_upgrade": sales >= 5 and bool(std.get("sent")) and not vip.get("sent"),
+        "fifty_eligible": amb.get("stories_shared", 0) >= 8 and sales < 3 and fifty_window_open and not fifty,
+        "referral_url": f"{SITE_URL}/tickets?ref={amb['code']}",
+    }
+
+
 # ---------------- order endpoints ----------------
 
 _rate_hits = {}
@@ -869,10 +1095,23 @@ def rate_limit(ip: str, limit: int = 10, window: int = 300):
 
 @api_router.get("/promo/validate")
 async def promo_validate(code: str):
-    promo = await db.promo_codes.find_one({"code": code.strip().upper(), "active": True})
-    if not promo:
-        return {"valid": False}
-    return {"valid": True, "percent_off": promo["percent_off"]}
+    c = code.strip().upper()
+    promo = await db.promo_codes.find_one({"code": c, "active": True})
+    if promo:
+        return {"valid": True, "percent_off": promo["percent_off"]}
+    amb = await db.ambassadors.find_one({"code": c, "active": True})
+    if amb:
+        sales = await ambassador_sales(c)
+        left = max(0, AMB_MAX_USES - sales)
+        if left <= 0:
+            return {"valid": False, "reason": "This code has no discounted tickets left"}
+        return {"valid": True, "amount_off_czk": AMB_DISCOUNT_CZK, "uses_left": left, "ambassador": amb["name"]}
+    amb2 = await db.ambassadors.find_one({"fifty.code": c, "active": True})
+    if amb2:
+        if amb2["fifty"].get("redeemed"):
+            return {"valid": False, "reason": "Code already redeemed"}
+        return {"valid": True, "percent_off": 50, "max_qty": 1, "ambassador": amb2["name"]}
+    return {"valid": False}
 
 
 @api_router.post("/orders/create")
@@ -887,6 +1126,7 @@ async def create_order(data: OrderCreateIn, request: Request):
     if not tier or tier["event_id"] != event["id"]:
         raise HTTPException(404, "Ticket tier not found")
     is_group = "GROUP" in tier["name"].upper()
+    is_gold = "GOLD" in tier["name"].upper()
     tickets_per_unit = 4 if is_group else 1
     if "VIP" not in tier["name"].upper() and not is_group:
         ga_tiers = await db.ticket_tiers.find({"event_id": event["id"]}).to_list(100)
@@ -901,17 +1141,58 @@ async def create_order(data: OrderCreateIn, request: Request):
             raise HTTPException(400, "All releases are sold out")
         if tier["id"] != active_id:
             raise HTTPException(400, "This release is not on sale yet")
-    sold = await db.tickets.count_documents({"tier_id": tier["id"]})
-    if sold + data.quantity * tickets_per_unit > tier["capacity"]:
-        raise HTTPException(400, "Not enough tickets left in this tier")
+    if is_gold:
+        if not (4 <= data.quantity <= 10):
+            raise HTTPException(400, "Gold table requires 4–10 guests")
+        tables_sold = await db.orders.count_documents({"tier_id": tier["id"], "payment_status": "paid"})
+        if tables_sold >= tier["capacity"]:
+            raise HTTPException(400, "Sold out")
+    else:
+        sold = await db.tickets.count_documents({"tier_id": tier["id"]})
+        if sold + data.quantity * tickets_per_unit > tier["capacity"]:
+            raise HTTPException(400, "Not enough tickets left in this tier")
     unit_price = tier["price_czk"]
     discount_percent = None
+    promo_code_used = None
     if data.promo_code:
-        promo = await db.promo_codes.find_one({"code": data.promo_code.strip().upper(), "active": True})
-        if not promo:
-            raise HTTPException(400, "Invalid discount code")
-        discount_percent = promo["percent_off"]
-        unit_price = max(1, round(unit_price * (100 - discount_percent) / 100))
+        if is_gold:
+            raise HTTPException(400, "Discount codes cannot be used for the Gold Table")
+        c = data.promo_code.strip().upper()
+        promo = await db.promo_codes.find_one({"code": c, "active": True})
+        if promo:
+            discount_percent = promo["percent_off"]
+            unit_price = max(1, round(unit_price * (100 - discount_percent) / 100))
+            promo_code_used = c
+        else:
+            amb = await db.ambassadors.find_one({"code": c, "active": True})
+            if amb:
+                if is_group or is_gold:
+                    raise HTTPException(400, "This code is valid for Standard and VIP Table tickets only")
+                sales = await ambassador_sales(c)
+                left = AMB_MAX_USES - sales
+                if left <= 0:
+                    raise HTTPException(400, "This code has no discounted tickets left")
+                if data.quantity > left:
+                    raise HTTPException(400, f"This code has only {left} discounted ticket(s) left")
+                unit_price = max(1, unit_price - AMB_DISCOUNT_CZK)
+                promo_code_used = c
+            else:
+                amb2 = await db.ambassadors.find_one({"fifty.code": c, "active": True})
+                if amb2 and not amb2["fifty"].get("redeemed"):
+                    if is_group or is_gold:
+                        raise HTTPException(400, "This code is valid for Standard and VIP Table tickets only")
+                    if data.quantity > 1:
+                        raise HTTPException(400, "This code is valid for one ticket only")
+                    discount_percent = 50
+                    unit_price = max(1, round(unit_price / 2))
+                    promo_code_used = c
+                else:
+                    raise HTTPException(400, "Invalid discount code")
+    if is_gold:
+        amount = 15000 + 3000 * max(0, data.quantity - 6)
+        unit_price = round(amount / data.quantity)
+    else:
+        amount = unit_price * data.quantity
     order = {
         "id": new_id(),
         "created_at": utcnow().isoformat(),
@@ -922,10 +1203,10 @@ async def create_order(data: OrderCreateIn, request: Request):
         "tier_name": ticket_display_name(tier["name"]),
         "quantity": data.quantity,
         "tickets_per_unit": tickets_per_unit,
-        "amount_czk": unit_price * data.quantity,
-        "list_price_czk": tier["price_czk"],
+        "amount_czk": amount,
+        "list_price_czk": 0 if is_gold else tier["price_czk"],
         "unit_price_czk": unit_price,
-        "promo_code": data.promo_code.strip().upper() if discount_percent else None,
+        "promo_code": promo_code_used,
         "discount_percent": discount_percent,
         "currency": "CZK",
         "buyer_name": data.name,
@@ -1161,6 +1442,8 @@ class ReservationIn(BaseModel):
 
 @api_router.post("/reservations")
 async def create_reservation(data: ReservationIn):
+    if "mainstream" in (data.floor or "").lower():
+        raise HTTPException(400, "This floor is not available for VIP table reservations")
     doc = {"id": new_id(), "topic": "VIP Table Reservation", **data.model_dump(), "created_at": utcnow().isoformat()}
     await db.messages.insert_one(doc)
     doc.pop("_id", None)
@@ -1242,7 +1525,13 @@ async def admin_stats(admin=Depends(get_current_admin)):
 
     paid_orders = [o for o in orders if (o.get("payment_status") or "paid_mock") in ("paid", "paid_mock")]
     revenue = sum(o["amount_czk"] for o in paid_orders)
-    list_total = sum((o.get("list_price_czk") or o["amount_czk"]) * o["quantity"] for o in paid_orders)
+
+    def _list_value(o):
+        if o.get("tier_name") == "VIP GOLD":
+            return o["amount_czk"]  # per-table pricing, no list math
+        return (o.get("list_price_czk") or o["amount_czk"]) * o["quantity"]
+
+    list_total = sum(_list_value(o) for o in paid_orders)
     promo_discount = sum(
         max(0, (o.get("list_price_czk") or 0) * o["quantity"] - o["amount_czk"])
         for o in paid_orders if o.get("promo_code")
@@ -1270,6 +1559,27 @@ async def admin_stats(admin=Depends(get_current_admin)):
     guest_checked = await db.tickets.count_documents({"guest_list": True, "status": "used"})
     vip_guest_list = await db.tickets.find({"guest_list": True}, {"_id": 0, "code": 1, "buyer_email": 1, "created_at": 1, "status": 1}).sort("created_at", -1).to_list(500)
 
+    ambs = await db.ambassadors.find({}, {"_id": 0}).to_list(500)
+    ambassadors_overview = {"active": 0, "total_sales": 0, "std_eligible": 0, "std_sent": 0,
+                            "vip_eligible": 0, "vip_sent": 0, "fifty_eligible": 0, "fifty_redeemed": 0}
+    for a in ambs:
+        st = await ambassador_public_state(a)
+        if a.get("active"):
+            ambassadors_overview["active"] += 1
+        ambassadors_overview["total_sales"] += st["sales"]
+        if st["std_eligible"]:
+            ambassadors_overview["std_eligible"] += 1
+        if (a.get("reward_standard") or {}).get("sent"):
+            ambassadors_overview["std_sent"] += 1
+        if st["vip_eligible"]:
+            ambassadors_overview["vip_eligible"] += 1
+        if (a.get("reward_vip") or {}).get("sent"):
+            ambassadors_overview["vip_sent"] += 1
+        if st["fifty_eligible"]:
+            ambassadors_overview["fifty_eligible"] += 1
+        if (a.get("fifty") or {}).get("redeemed"):
+            ambassadors_overview["fifty_redeemed"] += 1
+
     return {"revenue_czk": revenue, "orders": len(paid_orders), "tickets_sold": tickets_sold,
             "checked_in": checked_in, "per_tier": per_tier, "recent_scans": recent_scans,
             "categories": {
@@ -1278,6 +1588,7 @@ async def admin_stats(admin=Depends(get_current_admin)):
                 "vip_guest_list": {"sent": guest_sent, "checked_in": guest_checked},
             },
             "vip_guest_list": vip_guest_list,
+            "ambassadors": ambassadors_overview,
             "revenue_check": {
                 "list_total_czk": list_total,
                 "comp_tickets": comp_tickets,
@@ -1645,6 +1956,7 @@ async def startup():
     await db.sim_payments.create_index("id", unique=True)
     await db.meta_events.create_index("event_id", unique=True)
     await db.email_rate.create_index("key", unique=True)
+    await db.ambassadors.create_index("code", unique=True)
     await db.promo_codes.create_index("code", unique=True)
     await db.promo_codes.update_one(
         {"code": "ATFTEST95"},

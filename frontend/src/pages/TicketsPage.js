@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/api";
 import { trackEvent } from "@/lib/tracking";
 import Tickets from "@/components/site/Tickets";
@@ -10,6 +10,10 @@ export default function TicketsPage() {
   const [site, setSite] = useState(null);
   const [failed, setFailed] = useState(false);
   const { t } = useT();
+  const [params] = useSearchParams();
+  const refParam = params.get("ref");
+  if (refParam) localStorage.setItem("atf_ref", refParam.trim().toUpperCase());
+  const refCode = (refParam || localStorage.getItem("atf_ref") || "").trim().toUpperCase() || null;
 
   useEffect(() => {
     api
@@ -44,7 +48,7 @@ export default function TicketsPage() {
         </div>
       </header>
       {site ? (
-        <Tickets tiers={site.tiers} event={site.event} />
+        <Tickets tiers={site.tiers} event={site.event} refCode={refCode} />
       ) : (
         <p className="px-5 py-24 text-center font-mono2 text-xs uppercase tracking-[0.3em] text-white/40" data-testid="tickets-loading">
           {failed ? t("tickets.unavailable") : t("tickets.loading")}

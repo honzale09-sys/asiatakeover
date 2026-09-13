@@ -64,40 +64,61 @@ function PosterCarousel() {
   );
 }
 
-function CheckoutModal({ tier, event, onClose }) {
+function CheckoutModal({ tier, event, onClose, refCode }) {
   const { t } = useT();
   const isGroup = /group/i.test(tier.name);
-  const displayName = /vip/i.test(tier.name) ? t("tickets.vip") : isGroup ? `${t("tickets.group")} — 4× ${t("tickets.standard")}` : t("tickets.standard");
+  const isGold = /gold/i.test(tier.name);
+  const displayName = isGold ? t("tickets.gold") : /vip/i.test(tier.name) ? t("tickets.vip") : isGroup ? `${t("tickets.group")} — 4× ${t("tickets.standard")}` : t("tickets.standard");
   const [step, setStep] = useState("form");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState(isGold ? 4 : 1);
   const [payment, setPayment] = useState(null);
-  const [promoInput, setPromoInput] = useState("");
+  const [promoInput, setPromoInput] = useState(refCode || "");
   const [promoApplied, setPromoApplied] = useState(null);
   const left = Math.max(0, tier.capacity - (tier.sold || 0));
   const maxQty = Math.min(10, left || 10);
   const unitPrice = promoApplied
-    ? Math.max(1, Math.round((tier.price_czk * (100 - promoApplied.percent)) / 100))
+    ? (promoApplied.amount_off_czk
+      ? Math.max(1, tier.price_czk - promoApplied.amount_off_czk)
+      : Math.max(1, Math.round((tier.price_czk * (100 - promoApplied.percent)) / 100)))
     : tier.price_czk;
-  const totalPrice = unitPrice * qty;
+  const totalPrice = isGold ? 15000 + 3000 * Math.max(0, qty - 6) : unitPrice * qty;
 
-  const applyPromo = async () => {
-    if (!promoInput.trim()) return;
+  const applyPromo = async (codeOverride) => {
+    const raw = (codeOverride ?? promoInput).trim();
+    if (!raw) return;
     try {
-      const r = await api.get(`/promo/validate?code=${encodeURIComponent(promoInput.trim())}`);
+      const r = await api.get(`/promo/validate?code=${encodeURIComponent(raw)}`);
       if (r.data.valid) {
-        setPromoApplied({ code: promoInput.trim().toUpperCase(), percent: r.data.percent_off });
-        toast.success(`Discount applied — ${r.data.percent_off}% off`);
+        setPromoInput(raw.toUpperCase());
+        setPromoApplied({
+          code: raw.toUpperCase(),
+          percent: r.data.percent_off,
+          amount_off_czk: r.data.amount_off_czk || null,
+        });
+        toast.success(
+          r.data.amount_off_czk
+            ? `Discount applied — ${r.data.amount_off_czk} Kč off per ticket`
+            : `Discount applied — ${r.data.percent_off}% off`
+        );
       } else {
         setPromoApplied(null);
-        toast.error("Invalid discount code");
+        toast.error(r.data.reason || "Invalid discount code");
       }
     } catch {
       toast.error("Could not validate the code — try again");
     }
   };
+
+  const refAutoApplied = useRef(false);
+  useEffect(() => {
+    if (refCode && !refAutoApplied.current && !isGold) {
+      refAutoApplied.current = true;
+      applyPromo(refCode);
+    }
+  }, [refCode]);
 
   useEffect(() => {
     trackEvent("InitiateCheckout", {
@@ -202,6 +223,22 @@ function CheckoutModal({ tier, event, onClose }) {
                   <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">{t("checkout.quantity")}</label>
                   <p className="font-mono2 text-sm text-slate-300 py-2.5" data-testid="checkout-group-note">{t("checkout.groupNote")}</p>
                 </div>
+              ) : isGold ? (
+                <div>
+                  <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">{t("checkout.guestsGold")}</label>
+                  <select
+                    data-testid="checkout-quantity-select"
+                    className={inputCls}
+                    value={qty}
+                    onChange={(e) => setQty(Number(e.target.value))}
+                  >
+                    {[4, 5, 6, 7, 8, 9, 10].map((n) => (
+                      <option key={n} value={n}>
+                        {n} — {czk(15000 + 3000 * Math.max(0, n - 6))}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ) : (
                 <div>
                   <label className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-400 block mb-1.5">{t("checkout.quantity")}</label>
@@ -220,6 +257,7 @@ function CheckoutModal({ tier, event, onClose }) {
                 </div>
               )}
             </div>
+            {!isGold && (
             <div className="mt-6">
               <label className="font-mono2 text-[10px] uppercase tracking-[0.2em] text-slate-400">{t("checkout.discountCode")}</label>
               <div className="flex gap-2 mt-1.5">
@@ -241,10 +279,13 @@ function CheckoutModal({ tier, event, onClose }) {
               </div>
               {promoApplied && (
                 <p className="font-mono2 text-[11px] text-[#00F0FF] mt-2" data-testid="promo-applied-note">
-                  {t("checkout.codeApplied").replace("{code}", promoApplied.code).replace("{percent}", promoApplied.percent).replace("{price}", czk(tier.price_czk * qty))}
+                  {promoApplied.amount_off_czk
+                    ? `${promoApplied.code}: −${promoApplied.amount_off_czk} Kč / ${t("checkout.ticketOne")}`
+                    : t("checkout.codeApplied").replace("{code}", promoApplied.code).replace("{percent}", promoApplied.percent).replace("{price}", czk(tier.price_czk * qty))}
                 </p>
               )}
             </div>
+            )}
             <button
               type="submit"
               data-testid="checkout-pay-button"
@@ -278,7 +319,7 @@ function CheckoutModal({ tier, event, onClose }) {
             <h3 className="font-display font-extrabold text-xl uppercase mb-1">
               {displayName} — {czk(totalPrice)}
             </h3>
-            <p className="text-slate-400 text-sm mb-5">{isGroup ? t("checkout.groupTickets") : `${qty} ${qty > 1 ? t("checkout.ticketMany") : t("checkout.ticketOne")}`} · {email}</p>
+            <p className="text-slate-400 text-sm mb-5">{isGroup ? t("checkout.groupTickets") : isGold ? `${qty} ${t("checkout.guestsWord")}` : `${qty} ${qty > 1 ? t("checkout.ticketMany") : t("checkout.ticketOne")}`} · {email}</p>
             <div id="teya-checkout-container" data-testid="teya-checkout-container" className="bg-white rounded-xl overflow-hidden min-h-[320px]" />
             <p className="font-mono2 text-[10px] text-slate-600 mt-3 text-center">
               {t("checkout.teyaNote")}
@@ -290,14 +331,17 @@ function CheckoutModal({ tier, event, onClose }) {
   );
 }
 
-export default function Tickets({ tiers = [], event }) {
+export default function Tickets({ tiers = [], event, refCode }) {
   const [selected, setSelected] = useState(null);
   const { t } = useT();
   const isAvailable = (x) => (x.sold || 0) < x.capacity;
   const ga = [...tiers].filter((x) => !x.name.toUpperCase().includes("VIP") && !x.name.toUpperCase().includes("GROUP")).sort((a, b) => a.price_czk - b.price_czk);
-  const vipTiers = [...tiers].filter((x) => x.name.toUpperCase().includes("VIP")).sort((a, b) => a.price_czk - b.price_czk);
+  const vipTiers = [...tiers].filter((x) => x.name.toUpperCase().includes("VIP") && !x.name.toUpperCase().includes("GOLD")).sort((a, b) => a.price_czk - b.price_czk);
   const groupTiers = [...tiers].filter((x) => x.name.toUpperCase().includes("GROUP")).sort((a, b) => a.price_czk - b.price_czk);
   const group = groupTiers.find(isAvailable);
+  const goldTiers = [...tiers].filter((x) => x.name.toUpperCase().includes("GOLD"));
+  const gold = goldTiers[0];
+  const goldOut = gold ? !isAvailable(gold) : false;
   const activeGA = ga.find(isAvailable);
   const nextGA = activeGA ? ga[ga.indexOf(activeGA) + 1] : null;
   const vip = vipTiers.find(isAvailable) || vipTiers[vipTiers.length - 1];
@@ -458,6 +502,55 @@ export default function Tickets({ tiers = [], event }) {
               </div>
             )}
 
+            {gold && (
+              <div
+                data-testid={`ticket-tier-card-${gold.id}`}
+                className={`mt-5 rounded-3xl p-[1.5px] ${goldOut ? "opacity-60" : ""}`}
+                style={{ background: "linear-gradient(135deg, #8a6a1f, #f5d76e 30%, #b8912f 55%, #f9e7a0 75%, #8a6a1f)" }}
+              >
+                <div className="rounded-3xl bg-[#0D0E15] p-6 sm:p-8 shadow-[0_0_50px_rgba(201,162,39,0.12)]">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <p className="font-mono2 text-xs uppercase tracking-[0.3em] text-[#E7C55A]">{t("tickets.gold")}</p>
+                    <span
+                      data-testid="gold-badge"
+                      className="whitespace-nowrap font-mono2 text-[10px] font-bold uppercase tracking-[0.15em] text-black rounded-full px-3 py-1"
+                      style={{ background: "linear-gradient(90deg, #d4af37, #f5d76e)" }}
+                    >
+                      {t("tickets.goldBadge")}
+                    </span>
+                  </div>
+                  <p
+                    className="font-display font-black text-4xl sm:text-5xl mb-1 text-transparent bg-clip-text"
+                    style={{ backgroundImage: "linear-gradient(90deg, #d4af37, #f5d76e, #b8912f)" }}
+                    data-testid="gold-price"
+                  >
+                    {czk(gold.price_czk)}
+                  </p>
+                  <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#C9A227] mb-4">{t("tickets.goldPerTable")}</p>
+                  <p className="font-mono2 text-xs uppercase tracking-[0.12em] text-slate-300 mb-1" data-testid="gold-upto6">{t("tickets.goldUpTo6")}</p>
+                  <p className="font-mono2 text-[10px] uppercase tracking-[0.12em] text-slate-500 mb-5">{t("tickets.goldAdditional")}</p>
+                  <ul className="text-left space-y-2.5 text-sm text-slate-300 mb-6" data-testid="gold-perks-list">
+                    {[t("perks.gold1"), t("perks.gold2"), t("perks.gold3"), t("perks.gold4"), t("perks.gold5"), t("perks.gold6")].map((p) => (
+                      <li key={p} className="flex items-start gap-2.5">
+                        <span className="mt-0.5 shrink-0 text-sm leading-none text-[#E7C55A]">◆</span> {p}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    data-testid={`buy-ticket-button-${gold.id}`}
+                    disabled={goldOut}
+                    onClick={() => setSelected(gold)}
+                    className={`w-full font-display font-bold uppercase text-base py-4 rounded-full transition-all duration-200 active:scale-[0.97] min-h-[56px] ${
+                      goldOut ? "bg-white/5 text-slate-600 cursor-not-allowed" : "text-black hover:shadow-[0_0_35px_rgba(212,175,55,0.45)]"
+                    }`}
+                    style={goldOut ? undefined : { background: "linear-gradient(90deg, #b8912f, #f5d76e 50%, #d4af37)" }}
+                  >
+                    {goldOut ? t("tickets.soldOut") : t("tickets.buyGold")}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <p className="text-sm text-slate-400 mt-6 leading-relaxed" data-testid="standard-vip-note">
               {t("tickets.wantTable")}
             </p>
@@ -470,7 +563,7 @@ export default function Tickets({ tiers = [], event }) {
 
       <AnimatePresence>
         {selected && event && (
-          <CheckoutModal tier={selected} event={event} onClose={() => setSelected(null)} />
+          <CheckoutModal tier={selected} event={event} onClose={() => setSelected(null)} refCode={refCode} />
         )}
       </AnimatePresence>
     </section>

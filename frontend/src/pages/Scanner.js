@@ -150,8 +150,13 @@ export default function Scanner() {
     );
 
   const t = result?.ticket;
-  const isGuest = t && /guest\s*list/i.test(t.tier_name || "");
-  const isVip = t && /vip/i.test(t.tier_name || "") && !isGuest;
+  const tn = (t?.tier_name || "").toUpperCase();
+  const isGuest = t && /GUEST\s*LIST/.test(tn);
+  const isGold = t && tn.includes("GOLD");
+  const isAmbVip = t && tn === "AMBASSADOR VIP";
+  const isAmbStd = t && tn === "AMBASSADOR STANDARD";
+  const isVip = t && tn.includes("VIP") && !isGuest && !isGold && !isAmbVip;
+  const bigBadgeCls = "mt-3 inline-flex items-center gap-2 rounded-2xl border-2 px-6 py-3 font-display font-black uppercase text-xl sm:text-2xl tracking-wider";
   const vipBadge = isVip && (
     <span
       data-testid="scan-vip-badge"
@@ -163,9 +168,34 @@ export default function Scanner() {
   const guestBadge = isGuest && (
     <span
       data-testid="scan-guest-badge"
-      className="mt-3 inline-flex items-center gap-2 rounded-2xl border-2 border-[#C9A227] bg-[#C9A227] px-6 py-3 font-display font-black uppercase text-xl sm:text-2xl tracking-wider text-black shadow-[0_0_40px_rgba(201,162,39,0.55)]"
+      className={`${bigBadgeCls} border-[#C9A227] bg-[#C9A227] text-black shadow-[0_0_40px_rgba(201,162,39,0.55)]`}
     >
       🏆 VIP Guest List
+    </span>
+  );
+  const goldBadge = isGold && (
+    <span
+      data-testid="scan-gold-badge"
+      className={`${bigBadgeCls} border-[#d4af37] text-black shadow-[0_0_40px_rgba(212,175,55,0.55)]`}
+      style={{ background: "linear-gradient(90deg, #b8912f, #f5d76e 50%, #d4af37)" }}
+    >
+      ◆ VIP GOLD
+    </span>
+  );
+  const ambVipBadge = isAmbVip && (
+    <span
+      data-testid="scan-ambvip-badge"
+      className={`${bigBadgeCls} border-[#C9A227] bg-[#C9A227] text-black shadow-[0_0_40px_rgba(201,162,39,0.55)]`}
+    >
+      🏆 Ambassador VIP
+    </span>
+  );
+  const ambStdBadge = isAmbStd && (
+    <span
+      data-testid="scan-ambstd-badge"
+      className="mt-3 inline-flex items-center gap-2 rounded-2xl border-2 border-[#00F0FF] bg-[#00F0FF]/15 px-5 py-2.5 font-display font-black uppercase text-lg tracking-wider text-[#00F0FF]"
+    >
+      ★ Ambassador
     </span>
   );
 
@@ -264,6 +294,9 @@ export default function Scanner() {
                 <p className="font-mono2 text-xs text-[#00F0FF] mt-1 uppercase tracking-wider">{t.tier_name}</p>
                 {vipBadge}
                 {guestBadge}
+                {goldBadge}
+                {ambVipBadge}
+                {ambStdBadge}
                 <button
                   onClick={checkin}
                   data-testid="checkin-button"
@@ -281,6 +314,9 @@ export default function Scanner() {
                 <p className="text-slate-300 text-sm mt-1">{t.holder_name} · {t.tier_name}</p>
                 {vipBadge}
                 {guestBadge}
+                {goldBadge}
+                {ambVipBadge}
+                {ambStdBadge}
                 <p className="font-mono2 text-xs text-slate-400 mt-2">Ticket is now marked as used. Scan the next guest.</p>
               </div>
             )}
@@ -300,6 +336,9 @@ export default function Scanner() {
                 <p className="text-slate-300 text-sm mt-1">{t.holder_name} · {t.tier_name}</p>
                 {vipBadge}
                 {guestBadge}
+                {goldBadge}
+                {ambVipBadge}
+                {ambStdBadge}
                 <p className="font-mono2 text-xs text-slate-400 mt-2">
                   Checked in at {t.checked_in_at ? new Date(t.checked_in_at).toLocaleString("cs-CZ") : "—"}
                   {t.checked_in_by ? ` by ${t.checked_in_by}` : ""}

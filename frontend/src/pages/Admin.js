@@ -169,9 +169,20 @@ function OrdersTab() {
   const [orders, setOrders] = useState([]);
   const [q, setQ] = useState("");
   const [showAbandoned, setShowAbandoned] = useState(false);
+  const [ambNames, setAmbNames] = useState({});
   const load = (incl = showAbandoned) =>
     api.get(`/admin/orders${incl ? "?include_unpaid=1" : ""}`).then((r) => setOrders(r.data)).catch((e) => toast.error(formatError(e)));
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.get("/admin/ambassadors").then((r) => {
+      const m = {};
+      r.data.forEach((a) => {
+        m[a.code] = a.name;
+        if (a.fifty?.code) m[a.fifty.code] = `${a.name} (50%)`;
+      });
+      setAmbNames(m);
+    }).catch(() => {});
+  }, []);
 
   const toggleAbandoned = () => {
     const next = !showAbandoned;
@@ -283,12 +294,19 @@ function OrdersTab() {
                       ? "border-[#C9A227]/50 text-[#C9A227]"
                       : "border-[#00F0FF]/40 text-[#00F0FF]"
                   }`}>
-                    {/vip/i.test(o.tier_name || "") ? "VIP Table" : "Standard"}
+                    {o.guest_list ? "Guest List" : /ambassador/i.test(o.tier_name || "") ? "Ambassador" : /gold/i.test(o.tier_name || "") ? "VIP Gold" : /vip/i.test(o.tier_name || "") ? "VIP Table" : "Standard"}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-[#00F0FF] font-mono2 text-xs whitespace-nowrap">{o.tier_name}</td>
                 <td className="px-4 py-3">{o.quantity}</td>
-                <td className="px-4 py-3 text-[#FFE600] font-mono2 text-xs whitespace-nowrap">{czk(o.amount_czk)}</td>
+                <td className="px-4 py-3 text-[#FFE600] font-mono2 text-xs whitespace-nowrap">
+                  {czk(o.amount_czk)}
+                  {o.promo_code && (
+                    <p className="text-[10px] text-slate-500 mt-0.5" data-testid={`order-promo-${o.id.slice(0, 8)}`}>
+                      {o.promo_code}{ambNames[o.promo_code] ? ` · ${ambNames[o.promo_code]}` : ""}
+                    </p>
+                  )}
+                </td>
                 <td className="px-4 py-3 font-mono2 text-xs text-slate-400">
                   {o.tickets.map((t) => (
                     <span key={t.code} className={`inline-block mr-2 ${t.status === "used" ? "line-through text-slate-600" : ""}`}>{t.code}</span>
@@ -714,6 +732,162 @@ function MessagesTab() {
   );
 }
 
+function AmbassadorsTab() {
+  const [list, setList] = useState([]);
+  const [form, setForm] = useState({ name: "", instagram: "", email: "", code: "" });
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const load = () => api.get("/admin/ambassadors").then((r) => setList(r.data)).catch((e) => toast.error(formatError(e)));
+  useEffect(() => { load(); }, []);
+
+  const copy = (text, what) => {
+    navigator.clipboard.writeText(text).then(() => toast.success(`${what} copied`));
+  };
+
+  const create = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post("/admin/ambassadors", { ...form, code: form.code || null });
+      toast.success("Ambassador created");
+      setForm({ name: "", instagram: "", email: "", code: "" });
+      load();
+    } catch (err) { toast.error(formatError(err)); } finally { setSaving(false); }
+  };
+
+  const saveEdit = async (id) => {
+    try {
+      await api.put(`/admin/ambassadors/${id}`, editing);
+      toast.success("Saved");
+      setEditing(null);
+      load();
+    } catch (err) { toast.error(formatError(err)); }
+  };
+
+  const act = async (id, action, payload = {}) => {
+    try {
+      await api.post(`/admin/ambassadors/${id}/${action}`, payload);
+      load();
+    } catch (err) { toast.error(formatError(err)); }
+  };
+
+  const ov = {
+    active: list.filter((a) => a.active).length,
+    sales: list.reduce((s, a) => s + a.sales, 0),
+    stdEl: list.filter((a) => a.std_eligible).length,
+    stdSent: list.filter((a) => a.reward_standard?.sent).length,
+    vipEl: list.filter((a) => a.vip_eligible).length,
+    vipSent: list.filter((a) => a.reward_vip?.sent).length,
+    fiftyEl: list.filter((a) => a.fifty_eligible).length,
+    fiftyRe: list.filter((a) => a.fifty?.redeemed).length,
+  };
+
+  const btnCls = "font-mono2 text-[10px] uppercase tracking-[0.1em] border border-white/15 hover:border-[#00F0FF] hover:text-[#00F0FF] rounded-lg px-2.5 py-1.5 transition-colors";
+
+  return (
+    <div data-testid="ambassadors-tab">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-8">
+        {[["Active Ambassadors", ov.active, "amb-active"], ["Total Ambassador Sales", ov.sales, "amb-sales"],
+          ["Standard Eligible / Sent", `${ov.stdEl} / ${ov.stdSent}`, "amb-std"], ["VIP Eligible / Sent", `${ov.vipEl} / ${ov.vipSent}`, "amb-vip"],
+          ["50% Eligible / Redeemed", `${ov.fiftyEl} / ${ov.fiftyRe}`, "amb-fifty"]].map(([label, val, tid]) => (
+          <div key={tid} className={cardCls} data-testid={tid}>
+            <p className="font-mono2 text-[9px] uppercase tracking-[0.15em] text-slate-400 mb-2">{label}</p>
+            <p className="font-display font-black text-2xl">{val}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className={cardCls} data-testid="ambassador-create-card">
+        <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-slate-400 mb-5">New Ambassador</p>
+        <form onSubmit={create} className="grid sm:grid-cols-2 gap-3">
+          <input required placeholder="Name" className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="amb-name-input" />
+          <input placeholder="Instagram (e.g. @handle)" className={inputCls} value={form.instagram} onChange={(e) => setForm({ ...form, instagram: e.target.value })} data-testid="amb-instagram-input" />
+          <input required type="email" placeholder="Email" className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="amb-email-input" />
+          <input placeholder="Personal discount code (optional — auto)" className={inputCls} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} data-testid="amb-code-input" />
+          <button disabled={saving} data-testid="amb-create-button" className="sm:col-span-2 bg-[#FF6A00] hover:bg-[#FF8534] disabled:opacity-50 text-white font-display font-bold uppercase text-xs py-3 rounded-full transition-colors">
+            {saving ? "Creating…" : "Create Ambassador"}
+          </button>
+        </form>
+      </div>
+
+      <div className="space-y-4 mt-8" data-testid="ambassador-list">
+        {list.map((a) => {
+          const reward = a.reward_vip?.sent ? (a.reward_vip.upgraded ? "VIP SENT (upgraded)" : "VIP SENT")
+            : a.vip_eligible ? "VIP ELIGIBLE"
+            : a.reward_standard?.sent ? "STANDARD SENT"
+            : a.std_eligible ? "STANDARD ELIGIBLE" : "—";
+          const rewardCls = a.reward_vip?.sent || a.vip_eligible ? "text-[#C9A227]" : a.reward_standard?.sent || a.std_eligible ? "text-[#00F0FF]" : "text-slate-500";
+          return (
+            <div key={a.id} className={cardCls} data-testid={`amb-row-${a.code}`}>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-display font-bold text-base uppercase">{a.name} {!a.active && <span className="text-[#FF0055] text-xs">(INACTIVE)</span>}</p>
+                  <p className="font-mono2 text-[11px] text-slate-500">{a.instagram || "—"} · {a.email}</p>
+                  <p className="font-mono2 text-[11px] text-[#00F0FF] mt-1">
+                    Code: <span className="text-white">{a.code}</span> · Sales: {a.sales}/10
+                  </p>
+                  {a.fifty && (
+                    <p className="font-mono2 text-[11px] mt-1" data-testid={`amb-fifty-${a.code}`}>
+                      50% code: <span className="text-white">{a.fifty.code}</span>{" "}
+                      {a.fifty.redeemed ? <span className="text-[#FF0055] font-bold">REDEEMED</span> : <span className="text-green-400">ACTIVE</span>}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className={`font-mono2 text-[11px] font-bold uppercase tracking-wider ${rewardCls}`} data-testid={`amb-reward-${a.code}`}>{reward}</p>
+                  <div className="flex items-center justify-end gap-2 mt-2">
+                    <span className="font-mono2 text-[11px] text-slate-400">Stories {a.stories_shared}/8</span>
+                    <button onClick={() => act(a.id, "stories", { delta: -1 })} data-testid={`amb-stories-minus-${a.code}`} className={btnCls}>−</button>
+                    <button onClick={() => act(a.id, "stories", { delta: 1 })} data-testid={`amb-stories-plus-${a.code}`} className={btnCls}>+</button>
+                  </div>
+                </div>
+              </div>
+              {editing?.id === a.id ? (
+                <div className="grid sm:grid-cols-3 gap-2 mt-4">
+                  <input className={inputCls} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} data-testid="amb-edit-name" />
+                  <input className={inputCls} value={editing.instagram} onChange={(e) => setEditing({ ...editing, instagram: e.target.value })} data-testid="amb-edit-instagram" />
+                  <input className={inputCls} value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} data-testid="amb-edit-email" />
+                  <div className="sm:col-span-3 flex gap-2">
+                    <button onClick={() => saveEdit(a.id)} data-testid="amb-edit-save" className={btnCls}>Save</button>
+                    <button onClick={() => setEditing(null)} className={btnCls}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2 mt-4">
+                  <button onClick={() => copy(a.code, "Code")} data-testid={`amb-copy-code-${a.code}`} className={btnCls}>Copy code</button>
+                  <button onClick={() => copy(a.referral_url, "Link")} data-testid={`amb-copy-link-${a.code}`} className={btnCls}>Copy link</button>
+                  <a href={`/api/admin/ambassadors/${a.id}/qr.png`} download data-testid={`amb-qr-${a.code}`} className={btnCls}>Download QR</a>
+                  <button onClick={() => setEditing({ id: a.id, name: a.name, instagram: a.instagram, email: a.email })} data-testid={`amb-edit-${a.code}`} className={btnCls}>Edit</button>
+                  {a.std_eligible && (
+                    <button onClick={() => act(a.id, "send-reward", { type: "standard" })} data-testid={`amb-send-std-${a.code}`} className={`${btnCls} border-[#00F0FF] text-[#00F0FF]`}>Send reward (Standard)</button>
+                  )}
+                  {a.vip_eligible && !a.reward_standard?.sent && (
+                    <button onClick={() => act(a.id, "send-reward", { type: "vip" })} data-testid={`amb-send-vip-${a.code}`} className={`${btnCls} border-[#C9A227] text-[#C9A227]`}>Send reward (VIP)</button>
+                  )}
+                  {a.can_upgrade && (
+                    <button onClick={() => act(a.id, "upgrade-reward")} data-testid={`amb-upgrade-${a.code}`} className={`${btnCls} border-[#C9A227] text-[#C9A227]`}>Upgrade to VIP</button>
+                  )}
+                  {a.fifty_eligible && (
+                    <button onClick={() => act(a.id, "fifty-code")} data-testid={`amb-fifty-btn-${a.code}`} className={`${btnCls} border-[#FFE600] text-[#FFE600]`}>Create 50% code</button>
+                  )}
+                  <button
+                    onClick={() => api.put(`/admin/ambassadors/${a.id}`, { active: !a.active }).then(load).catch((e) => toast.error(formatError(e)))}
+                    data-testid={`amb-toggle-${a.code}`}
+                    className={`${btnCls} ${a.active ? "border-[#FF0055] text-[#FF0055]" : "border-green-400 text-green-400"}`}
+                  >
+                    {a.active ? "Deactivate" : "Activate"}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {list.length === 0 && <p className="text-slate-600 font-mono2 text-xs">No ambassadors yet</p>}
+      </div>
+    </div>
+  );
+}
+
 const TABS = [
   ["overview", "Overview"],
   ["orders", "Orders & Tickets"],
@@ -721,6 +895,7 @@ const TABS = [
   ["tiers", "Ticket Tiers"],
   ["content", "Site Content"],
   ["messages", "Messages"],
+  ["ambassadors", "Ambassadors"],
 ];
 
 export default function Admin() {
@@ -777,6 +952,7 @@ export default function Admin() {
         {tab === "tiers" && <TiersTab />}
         {tab === "content" && <ContentTab />}
         {tab === "messages" && <MessagesTab />}
+        {tab === "ambassadors" && <AmbassadorsTab />}
       </div>
     </div>
   );
