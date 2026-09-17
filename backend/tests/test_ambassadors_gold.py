@@ -41,35 +41,39 @@ def _order_or_skip(*args, **kwargs):
 def test_gold_price_4_guests():
     r = _order_or_skip(GOLD_TIER, 4)
     assert r.status_code == 200, r.text
-    assert r.json()["amount_czk"] == 15000
+    assert r.json()["amount_czk"] == 7595
 
 
 def test_gold_price_6_guests():
-    assert _order_or_skip(GOLD_TIER, 6).json()["amount_czk"] == 15000
+    assert _order_or_skip(GOLD_TIER, 6).json()["amount_czk"] == 9393
 
 
 def test_gold_price_7_guests():
-    assert _order_or_skip(GOLD_TIER, 7).json()["amount_czk"] == 18000
+    assert _order_or_skip(GOLD_TIER, 7).json()["amount_czk"] == 10292
 
 
 def test_gold_price_8_guests():
-    assert _order_or_skip(GOLD_TIER, 8).json()["amount_czk"] == 21000
+    assert _order_or_skip(GOLD_TIER, 8).json()["amount_czk"] == 11191
 
 
 def test_gold_price_9_guests():
-    assert _order_or_skip(GOLD_TIER, 9).json()["amount_czk"] == 24000
+    assert _order_or_skip(GOLD_TIER, 9).json()["amount_czk"] == 12090
 
 
 def test_gold_price_10_guests():
-    assert _order_or_skip(GOLD_TIER, 10).json()["amount_czk"] == 27000
+    assert _order_or_skip(GOLD_TIER, 10).json()["amount_czk"] == 12989
+
+
+def test_gold_price_14_guests():
+    assert _order_or_skip(GOLD_TIER, 14).json()["amount_czk"] == 16585
 
 
 def test_gold_below_4_rejected():
     assert _order(GOLD_TIER, 3).status_code == 400
 
 
-def test_gold_above_10_rejected():
-    assert _order(GOLD_TIER, 11).status_code in (400, 422)  # 422 = pydantic max-quantity guard
+def test_gold_above_14_rejected():
+    assert _order(GOLD_TIER, 15).status_code in (400, 422)  # 422 = pydantic max-quantity guard
 
 
 def test_gold_promo_rejected():

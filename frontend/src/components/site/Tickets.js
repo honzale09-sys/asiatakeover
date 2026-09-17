@@ -84,7 +84,7 @@ function CheckoutModal({ tier, event, onClose, refCode }) {
       ? Math.max(1, tier.price_czk - promoApplied.amount_off_czk)
       : Math.max(1, Math.round((tier.price_czk * (100 - promoApplied.percent)) / 100)))
     : tier.price_czk;
-  const totalPrice = isGold ? 15000 + 3000 * Math.max(0, qty - 6) : unitPrice * qty;
+  const totalPrice = isGold ? 3999 + 899 * qty : unitPrice * qty;
 
   const applyPromo = async (codeOverride) => {
     const raw = (codeOverride ?? promoInput).trim();
@@ -232,9 +232,9 @@ function CheckoutModal({ tier, event, onClose, refCode }) {
                     value={qty}
                     onChange={(e) => setQty(Number(e.target.value))}
                   >
-                    {[4, 5, 6, 7, 8, 9, 10].map((n) => (
+                    {Array.from({ length: 11 }, (_, i) => i + 4).map((n) => (
                       <option key={n} value={n}>
-                        {n} — {czk(15000 + 3000 * Math.max(0, n - 6))}
+                        {n} — {czk(3999 + 899 * n)}
                       </option>
                     ))}
                   </select>
@@ -264,13 +264,14 @@ function CheckoutModal({ tier, event, onClose, refCode }) {
                 <input
                   value={promoInput}
                   onChange={(e) => { setPromoInput(e.target.value); setPromoApplied(null); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyPromo(); } }}
                   placeholder={t("checkout.enterCode")}
                   data-testid="checkout-promo-input"
                   className="flex-1 bg-black/50 border border-white/15 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F0FF] uppercase placeholder:normal-case"
                 />
                 <button
                   type="button"
-                  onClick={applyPromo}
+                  onClick={() => applyPromo()}
                   data-testid="checkout-promo-apply"
                   className="font-mono2 text-xs uppercase tracking-[0.15em] border border-white/25 hover:border-[#00F0FF] hover:text-[#00F0FF] rounded-xl px-5 transition-colors"
                 >
@@ -333,7 +334,7 @@ function CheckoutModal({ tier, event, onClose, refCode }) {
 
 export default function Tickets({ tiers = [], event, refCode }) {
   const [selected, setSelected] = useState(null);
-  const { t } = useT();
+  const { t, lp } = useT();
   const isAvailable = (x) => (x.sold || 0) < x.capacity;
   const ga = [...tiers].filter((x) => !x.name.toUpperCase().includes("VIP") && !x.name.toUpperCase().includes("GROUP")).sort((a, b) => a.price_czk - b.price_czk);
   const vipTiers = [...tiers].filter((x) => x.name.toUpperCase().includes("VIP") && !x.name.toUpperCase().includes("GOLD")).sort((a, b) => a.price_czk - b.price_czk);
@@ -487,7 +488,7 @@ export default function Tickets({ tiers = [], event, refCode }) {
                   {vipOut ? t("tickets.soldOut") : t("tickets.buy")}
                 </button>
                 <Link
-                  to="/reserve"
+                  to={lp("/reserve")}
                   data-testid="reserve-table-button"
                   className="mt-3 w-full inline-flex items-center justify-center border border-[#C9A227] text-[#C9A227] hover:bg-[#C9A227] hover:text-black font-display font-bold uppercase text-sm py-3.5 rounded-full transition-all duration-200 active:scale-[0.97]"
                 >
@@ -520,15 +521,12 @@ export default function Tickets({ tiers = [], event, refCode }) {
                     </span>
                   </div>
                   <p
-                    className="font-display font-black text-4xl sm:text-5xl mb-1 text-transparent bg-clip-text"
+                    className="font-display font-black text-2xl sm:text-3xl mb-5 text-transparent bg-clip-text leading-snug"
                     style={{ backgroundImage: "linear-gradient(90deg, #d4af37, #f5d76e, #b8912f)" }}
                     data-testid="gold-price"
                   >
-                    {czk(gold.price_czk)}
+                    {t("tickets.goldFee")}
                   </p>
-                  <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#C9A227] mb-4">{t("tickets.goldPerTable")}</p>
-                  <p className="font-mono2 text-xs uppercase tracking-[0.12em] text-slate-300 mb-1" data-testid="gold-upto6">{t("tickets.goldUpTo6")}</p>
-                  <p className="font-mono2 text-[10px] uppercase tracking-[0.12em] text-slate-500 mb-5">{t("tickets.goldAdditional")}</p>
                   <ul className="text-left space-y-2.5 text-sm text-slate-300 mb-6" data-testid="gold-perks-list">
                     {[t("perks.gold1"), t("perks.gold2"), t("perks.gold3"), t("perks.gold4"), t("perks.gold5"), t("perks.gold6")].map((p) => (
                       <li key={p} className="flex items-start gap-2.5">

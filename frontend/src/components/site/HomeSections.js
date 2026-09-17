@@ -159,7 +159,7 @@ export function InsideDuplex() {
 }
 
 export function BuyTicketsCta() {
-  const { t } = useT();
+  const { t, lp } = useT();
   return (
     <section className={`${sectionCls} bg-[#1F050D] text-center`} data-testid="buy-tickets-cta-section">
       <Reveal>
@@ -168,7 +168,7 @@ export function BuyTicketsCta() {
           {t("home.ctaA")} <span className="text-[#FF0055]">{t("home.ctaB")}</span>
         </h2>
         <Link
-          to="/tickets"
+          to={lp("/tickets")}
           data-testid="buy-tickets-cta-button"
           className="inline-flex items-center justify-center bg-[#FF6A00] hover:bg-[#FF7A1A] text-white font-display font-bold uppercase tracking-[0.15em] text-sm rounded-full px-10 py-4 transition-colors duration-300 shadow-[0_0_45px_rgba(255,106,0,0.35)]"
         >

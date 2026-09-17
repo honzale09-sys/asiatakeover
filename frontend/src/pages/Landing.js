@@ -28,7 +28,7 @@ const FALLBACK = {
 };
 
 function UpcomingEvents({ event }) {
-  const { t } = useT();
+  const { t, lp } = useT();
   return (
     <section className="px-4 sm:px-8 lg:px-16 py-12 lg:py-16 bg-[#0B0C12] border-y border-white/5" data-testid="upcoming-events-section">
       <Reveal>
@@ -37,7 +37,7 @@ function UpcomingEvents({ event }) {
           {t("land.upcomingA")} <span className="text-[#FF0055]">{t("land.upcomingB")}</span>
         </h2>
         <Link
-          to="/tickets"
+          to={lp("/tickets")}
           data-testid="upcoming-event-poster-link"
           className="group block w-full max-w-xs"
         >

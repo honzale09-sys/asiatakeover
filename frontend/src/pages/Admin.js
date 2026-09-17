@@ -701,33 +701,193 @@ function ContentTab() {
   );
 }
 
+const MSG_STATUSES = ["new", "contacted", "confirmed", "declined"];
+const MSG_STATUS_STYLES = {
+  new: "text-[#00F0FF] border-[#00F0FF]/40",
+  contacted: "text-[#FFE600] border-[#FFE600]/40",
+  confirmed: "text-green-400 border-green-400/40",
+  declined: "text-[#FF0055] border-[#FF0055]/40",
+};
+
+function floorKey(f) {
+  const x = (f || "").toLowerCase();
+  if (x.includes("saigon") || x.includes("5th")) return "saigon";
+  if (x.includes("mainstream") || x.includes("6th")) return "mainstream";
+  if (x.includes("seoul") || x.includes("7th")) return "seoul";
+  return "other";
+}
+
 function MessagesTab() {
   const [messages, setMessages] = useState([]);
-  useEffect(() => {
-    api.get("/admin/messages").then((r) => setMessages(r.data)).catch((e) => toast.error(formatError(e)));
-  }, []);
+  const [floor, setFloor] = useState("all");
+  const [minG, setMinG] = useState("");
+  const [maxG, setMaxG] = useState("");
+  const [sort, setSort] = useState("newest");
+  const [search, setSearch] = useState("");
+  const [statusF, setStatusF] = useState("all");
+  const [editStatus, setEditStatus] = useState({});
+  const [confirmRemove, setConfirmRemove] = useState(null);
+
+  const load = () => api.get("/admin/messages").then((r) => setMessages(r.data)).catch((e) => toast.error(formatError(e)));
+  useEffect(() => { load(); }, []);
+
+  const saveStatus = async (id) => {
+    try {
+      await api.put(`/admin/messages/${id}`, { status: editStatus[id] });
+      toast.success("Status saved");
+      setEditStatus((s) => { const n = { ...s }; delete n[id]; return n; });
+      load();
+    } catch (e) { toast.error(formatError(e)); }
+  };
+
+  const remove = async (id) => {
+    try {
+      await api.post(`/admin/messages/${id}/remove`);
+      toast.success("Moved to Removed");
+      setConfirmRemove(null);
+      load();
+    } catch (e) { toast.error(formatError(e)); }
+  };
+
+  const restore = async (id) => {
+    try {
+      await api.post(`/admin/messages/${id}/restore`);
+      toast.success("Restored");
+      load();
+    } catch (e) { toast.error(formatError(e)); }
+  };
+
+  const filtered = messages
+    .filter((m) => {
+      if (statusF === "removed") {
+        if (!m.removed) return false;
+      } else {
+        if (m.removed) return false;
+        if (statusF !== "all" && (m.status || "new") !== statusF) return false;
+      }
+      if (floor !== "all" && floorKey(m.floor) !== floor) return false;
+      if ((minG !== "" || maxG !== "") && m.guests == null) return false;
+      if (minG !== "" && (m.guests || 0) < Number(minG)) return false;
+      if (maxG !== "" && (m.guests || 0) > Number(maxG)) return false;
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const hay = `${m.name || ""} ${m.email || ""} ${m.phone || ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sort === "oldest") return new Date(a.created_at) - new Date(b.created_at);
+      if (sort === "guests-asc") return (a.guests || 0) - (b.guests || 0);
+      if (sort === "guests-desc") return (b.guests || 0) - (a.guests || 0);
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+  const actBtn = "font-mono2 text-[10px] uppercase tracking-[0.1em] border border-white/15 hover:border-[#00F0FF] hover:text-[#00F0FF] rounded-lg px-2.5 py-1.5 transition-colors";
+
   return (
     <div className="space-y-4 max-w-3xl" data-testid="admin-messages">
-      {messages.map((m) => (
-        <div key={m.id} className={cardCls} data-testid={`message-${m.id.slice(0, 8)}`}>
-          <div className="flex flex-wrap items-center gap-3 mb-2">
-            <p className="font-display font-bold text-sm uppercase">{m.name}</p>
-            <span className="font-mono2 text-[11px] text-[#00F0FF] border border-[#00F0FF]/30 rounded-full px-2.5 py-0.5">{m.topic}</span>
-            <span className="font-mono2 text-[11px] text-slate-500">{new Date(m.created_at).toLocaleString("cs-CZ")}</span>
+      <div className={`${cardCls} !p-4`} data-testid="messages-filters">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div>
+            <label className={labelCls}>Floor</label>
+            <select className={inputCls} value={floor} onChange={(e) => setFloor(e.target.value)} data-testid="messages-filter-floor">
+              <option value="all">All floors</option>
+              <option value="saigon">5th Saigon</option>
+              <option value="mainstream">6th Mainstream</option>
+              <option value="seoul">7th Seoul</option>
+            </select>
           </div>
-          <p className="font-mono2 text-xs text-slate-400 mb-2">
-            {m.email}
-            {m.phone && <span className="text-slate-500"> · {m.phone}</span>}
-          </p>
-          {(m.guests || m.floor) && (
-            <p className="font-mono2 text-xs text-[#C9A227] mb-2" data-testid={`message-meta-${m.id.slice(0, 8)}`}>
-              {m.guests && `${m.guests} guests`}{m.guests && m.floor && " · "}{m.floor}
-            </p>
-          )}
-          <p className="text-sm text-slate-300 leading-relaxed">{m.message}</p>
+          <div>
+            <label className={labelCls}>Status</label>
+            <select className={inputCls} value={statusF} onChange={(e) => setStatusF(e.target.value)} data-testid="messages-filter-status">
+              <option value="all">All active</option>
+              <option value="new">New</option>
+              <option value="contacted">Contacted</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="declined">Declined</option>
+              <option value="removed">Removed</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Sort</label>
+            <select className={inputCls} value={sort} onChange={(e) => setSort(e.target.value)} data-testid="messages-filter-sort">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="guests-asc">Guests low–high</option>
+              <option value="guests-desc">Guests high–low</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Min guests</label>
+            <input type="number" min="1" className={inputCls} value={minG} onChange={(e) => setMinG(e.target.value)} data-testid="messages-filter-min-guests" />
+          </div>
+          <div>
+            <label className={labelCls}>Max guests</label>
+            <input type="number" min="1" className={inputCls} value={maxG} onChange={(e) => setMaxG(e.target.value)} data-testid="messages-filter-max-guests" />
+          </div>
+          <div className="col-span-2 sm:col-span-1">
+            <label className={labelCls}>Search</label>
+            <input className={inputCls} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, email or phone" data-testid="messages-filter-search" />
+          </div>
         </div>
-      ))}
-      {messages.length === 0 && <p className="font-mono2 text-xs text-slate-500">No messages yet.</p>}
+      </div>
+
+      {filtered.map((m) => {
+        const st = m.status || "new";
+        const pending = editStatus[m.id];
+        const short = m.id.slice(0, 8);
+        return (
+          <div key={m.id} className={cardCls} data-testid={`message-${short}`}>
+            <div className="flex flex-wrap items-center gap-3 mb-2">
+              <p className="font-display font-bold text-sm uppercase">{m.name}</p>
+              <span className="font-mono2 text-[11px] text-[#00F0FF] border border-[#00F0FF]/30 rounded-full px-2.5 py-0.5">{m.topic}</span>
+              <span className={`font-mono2 text-[11px] border rounded-full px-2.5 py-0.5 ${m.removed ? "text-slate-500 border-white/15" : MSG_STATUS_STYLES[st]}`} data-testid={`message-status-${short}`}>
+                {m.removed ? "Removed" : st}
+              </span>
+              <span className="font-mono2 text-[11px] text-slate-500">{new Date(m.created_at).toLocaleString("cs-CZ")}</span>
+            </div>
+            <p className="font-mono2 text-xs text-slate-400 mb-2">
+              {m.email}
+              {m.phone && <span className="text-slate-500"> · {m.phone}</span>}
+            </p>
+            {(m.guests || m.floor) && (
+              <p className="font-mono2 text-xs text-[#C9A227] mb-2" data-testid={`message-meta-${short}`}>
+                {m.guests && `${m.guests} guests`}{m.guests && m.floor && " · "}{m.floor}
+              </p>
+            )}
+            <p className="text-sm text-slate-300 leading-relaxed">{m.message}</p>
+            <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-2">
+              {m.removed ? (
+                <button onClick={() => restore(m.id)} className={actBtn} data-testid={`message-restore-${short}`}>Restore</button>
+              ) : (
+                <>
+                  <select
+                    className={`${inputCls} !w-auto !py-1.5 text-xs`}
+                    value={pending ?? st}
+                    onChange={(e) => setEditStatus((s) => ({ ...s, [m.id]: e.target.value }))}
+                    data-testid={`message-status-select-${short}`}
+                  >
+                    {MSG_STATUSES.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
+                  </select>
+                  {pending && pending !== st && (
+                    <button onClick={() => saveStatus(m.id)} className={`${actBtn} border-[#00F0FF] text-[#00F0FF]`} data-testid={`message-status-save-${short}`}>Save</button>
+                  )}
+                  {confirmRemove === m.id ? (
+                    <>
+                      <button onClick={() => remove(m.id)} className="font-mono2 text-[10px] uppercase tracking-[0.1em] border border-[#FF0055] text-[#FF0055] rounded-lg px-2.5 py-1.5 transition-colors" data-testid={`message-remove-confirm-${short}`}>Confirm remove</button>
+                      <button onClick={() => setConfirmRemove(null)} className={actBtn} data-testid={`message-remove-cancel-${short}`}>Cancel</button>
+                    </>
+                  ) : (
+                    <button onClick={() => setConfirmRemove(m.id)} className={`${actBtn} hover:border-[#FF0055] hover:text-[#FF0055]`} data-testid={`message-remove-${short}`}>Remove</button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      {filtered.length === 0 && <p className="font-mono2 text-xs text-slate-500" data-testid="messages-empty">No messages match the current filters.</p>}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Toaster } from "sonner";
 import Landing from "@/pages/Landing";
 import TicketsPage from "@/pages/TicketsPage";
@@ -15,7 +15,7 @@ import Admin from "@/pages/Admin";
 import Scanner from "@/pages/Scanner";
 import CookieBanner from "@/components/CookieBanner";
 import Lockdown from "@/components/Lockdown";
-import { LangProvider } from "@/i18n";
+import { LangProvider, useT, LANG_CODES } from "@/i18n";
 import { captureAttribution, getConsent, initGTM, initPixel, marketingAllowed, trackEvent } from "@/lib/tracking";
 
 function RouteTracker() {
@@ -33,24 +33,71 @@ function RouteTracker() {
   return null;
 }
 
+const NO_PREFIX = ["admin", "nascanujtobrasko"];
+
+function LangSync() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { lang, setLang, setUrlLang } = useT();
+  useEffect(() => {
+    const seg = pathname.split("/")[1] || "";
+    if (LANG_CODES.includes(seg)) {
+      setUrlLang(seg);
+      if (seg !== lang) setLang(seg);
+      return;
+    }
+    setUrlLang(null);
+    if (NO_PREFIX.includes(seg)) return;
+    const saved = localStorage.getItem("atf_lang");
+    if (saved && saved !== "en" && LANG_CODES.includes(saved)) {
+      navigate(`/${saved}${pathname === "/" ? "" : pathname}`, { replace: true });
+    }
+  }, [pathname]);
+  return null;
+}
+
+function LangGuard({ children }) {
+  const { lang } = useParams();
+  const { pathname } = useLocation();
+  if (lang && !LANG_CODES.includes(lang)) {
+    const rest = pathname.slice(lang.length + 1) || "/";
+    return <Navigate to={rest} replace />;
+  }
+  return children;
+}
+
+const PUBLIC_ROUTES = [
+  ["/", <Landing />],
+  ["/tickets", <TicketsPage />],
+  ["/success", <Success />],
+  ["/pay/:orderId", <PaySim />],
+  ["/terms", <Terms />],
+  ["/contact", <ContactPage />],
+  ["/faq", <FaqPage />],
+  ["/gallery", <GalleryPage />],
+  ["/reserve", <ReservePage />],
+  ["/privacy", <PrivacyPage />],
+];
+
 export default function App() {
   return (
     <LangProvider>
     <BrowserRouter>
       <Toaster theme="dark" position="top-center" richColors />
       <RouteTracker />
+      <LangSync />
       <CookieBanner />
       <Routes>
-        <Route path="/" element={<Lockdown><Landing /></Lockdown>} />
-        <Route path="/tickets" element={<Lockdown><TicketsPage /></Lockdown>} />
-        <Route path="/success" element={<Lockdown><Success /></Lockdown>} />
-        <Route path="/pay/:orderId" element={<Lockdown><PaySim /></Lockdown>} />
-        <Route path="/terms" element={<Lockdown><Terms /></Lockdown>} />
-        <Route path="/contact" element={<Lockdown><ContactPage /></Lockdown>} />
-        <Route path="/faq" element={<Lockdown><FaqPage /></Lockdown>} />
-        <Route path="/gallery" element={<Lockdown><GalleryPage /></Lockdown>} />
-        <Route path="/reserve" element={<Lockdown><ReservePage /></Lockdown>} />
-        <Route path="/privacy" element={<Lockdown><PrivacyPage /></Lockdown>} />
+        {PUBLIC_ROUTES.map(([path, el]) => (
+          <Route key={path} path={path} element={<Lockdown>{el}</Lockdown>} />
+        ))}
+        {PUBLIC_ROUTES.map(([path, el]) => (
+          <Route
+            key={`lang:${path}`}
+            path={`/:lang${path === "/" ? "" : path}`}
+            element={<LangGuard><Lockdown>{el}</Lockdown></LangGuard>}
+          />
+        ))}
         <Route path="/admin" element={<Admin />} />
         <Route path="/nascanujtobrasko" element={<Scanner />} />
       </Routes>

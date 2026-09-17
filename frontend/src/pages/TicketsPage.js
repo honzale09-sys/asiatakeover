@@ -9,7 +9,7 @@ import { useT } from "@/i18n";
 export default function TicketsPage() {
   const [site, setSite] = useState(null);
   const [failed, setFailed] = useState(false);
-  const { t } = useT();
+  const { t, lp } = useT();
   const [params] = useSearchParams();
   const refParam = params.get("ref");
   if (refParam) localStorage.setItem("atf_ref", refParam.trim().toUpperCase());
@@ -37,7 +37,7 @@ export default function TicketsPage() {
     <div className="min-h-screen bg-[#060609] text-white" data-testid="tickets-page">
       <div className="noise-bg fixed inset-0 z-[60] pointer-events-none opacity-[0.05]" />
       <header className="px-5 sm:px-10 h-16 flex items-center justify-between border-b border-white/10">
-        <Link to="/" data-testid="tickets-back-link" className="font-display font-black text-[11px] sm:text-xs tracking-[0.3em] uppercase hover:opacity-60 transition-opacity">
+        <Link to={lp("/")} data-testid="tickets-back-link" className="font-display font-black text-[11px] sm:text-xs tracking-[0.3em] uppercase hover:opacity-60 transition-opacity">
           ← Asia Takeover
         </Link>
         <div className="flex items-center gap-4 opacity-80">

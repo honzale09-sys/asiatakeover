@@ -5,7 +5,7 @@ import { useT } from "@/i18n";
 const ease = [0.16, 1, 0.3, 1];
 
 export default function Hero({ event, tiers = [] }) {
-  const { t } = useT();
+  const { t, lp } = useT();
   const ga = [...tiers]
     .filter((t2) => !t2.name.toUpperCase().includes("VIP") && !t2.name.toUpperCase().includes("GROUP"))
     .sort((a, b) => a.price_czk - b.price_czk);
@@ -86,7 +86,7 @@ export default function Hero({ event, tiers = [] }) {
 
           {activeGA ? (
             <Link
-              to="/tickets"
+              to={lp("/tickets")}
               data-testid="buy-tickets-button"
               className="mt-7 inline-block whitespace-nowrap bg-[#FF6A00] hover:bg-[#FF8534] active:scale-95 text-white font-display font-bold uppercase text-xs sm:text-base tracking-[0.12em] sm:tracking-[0.15em] px-8 sm:px-12 py-4 rounded-full shadow-[0_0_24px_rgba(255,106,0,0.3)] transition-all duration-300 min-h-[54px]"
             >

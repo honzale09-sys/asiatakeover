@@ -3,7 +3,7 @@ import { Instagram } from "lucide-react";
 import { useT } from "@/i18n";
 
 export default function Footer() {
-  const { t } = useT();
+  const { t, lp } = useT();
   return (
     <footer className="border-t border-white/10 bg-[#0B0C12]" data-testid="footer">
       <div className="px-4 sm:px-8 lg:px-16 py-14 grid gap-12 sm:grid-cols-3">
@@ -16,11 +16,11 @@ export default function Footer() {
         <div>
           <p className="font-display font-bold text-sm uppercase mb-5">{t("footer.quickLinks")}</p>
           <ul className="space-y-3 text-sm text-slate-400">
-            <li><Link to="/gallery" data-testid="footer-gallery-link" className="hover:text-white transition-colors">{t("nav.gallery")}</Link></li>
-            <li><Link to="/faq" data-testid="footer-faq-link" className="hover:text-white transition-colors">{t("footer.faq")}</Link></li>
-            <li><Link to="/terms" data-testid="footer-terms-link" className="hover:text-white transition-colors">{t("footer.terms")}</Link></li>
-            <li><Link to="/privacy" data-testid="footer-privacy-link" className="hover:text-white transition-colors">{t("footer.privacy")}</Link></li>
-            <li><Link to="/terms" data-testid="footer-refund-link" className="hover:text-white transition-colors">{t("footer.refund")}</Link></li>
+            <li><Link to={lp("/gallery")} data-testid="footer-gallery-link" className="hover:text-white transition-colors">{t("nav.gallery")}</Link></li>
+            <li><Link to={lp("/faq")} data-testid="footer-faq-link" className="hover:text-white transition-colors">{t("footer.faq")}</Link></li>
+            <li><Link to={lp("/terms")} data-testid="footer-terms-link" className="hover:text-white transition-colors">{t("footer.terms")}</Link></li>
+            <li><Link to={lp("/privacy")} data-testid="footer-privacy-link" className="hover:text-white transition-colors">{t("footer.privacy")}</Link></li>
+            <li><Link to={lp("/terms")} data-testid="footer-refund-link" className="hover:text-white transition-colors">{t("footer.refund")}</Link></li>
           </ul>
         </div>
         <div>

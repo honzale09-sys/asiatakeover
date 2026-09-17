@@ -59,7 +59,7 @@ export default function Success() {
   }, [orderId]);
 
   const ps = status?.payment_status;
-  const { t } = useT();
+  const { t, lp } = useT();
 
   return (
     <div className="min-h-screen bg-[#060609] text-white flex items-center justify-center px-4" data-testid="success-page">
@@ -119,7 +119,7 @@ export default function Success() {
               {t("success.noCharge")}
             </p>
             <Link
-              to="/tickets"
+              to={lp("/tickets")}
               data-testid="success-back-to-tickets"
               className="inline-block bg-[#FF6A00] hover:bg-[#FF8534] text-white font-display font-bold uppercase text-sm px-8 py-3.5 rounded-full transition-colors"
             >
@@ -139,7 +139,7 @@ export default function Success() {
           <div data-testid="success-missing">
             <h1 className="font-display font-extrabold text-2xl uppercase mb-2">{t("success.notFound")}</h1>
             <p className="text-slate-400 text-sm mb-6">{t("success.notFoundText")}</p>
-            <Link to="/" className="font-mono2 text-xs uppercase tracking-[0.2em] text-[#00F0FF]">{t("success.backHome")}</Link>
+            <Link to={lp("/")} className="font-mono2 text-xs uppercase tracking-[0.2em] text-[#00F0FF]">{t("success.backHome")}</Link>
           </div>
         )}
       </div>

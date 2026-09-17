@@ -15,11 +15,14 @@ export const LANGS = [
   { code: "zh", label: "中文" },
 ];
 
+export const LANG_CODES = LANGS.map((l) => l.code);
+
 const DICTS = { en, vi, mn, kk, ky, zh };
 const LangCtx = createContext(null);
 
 export function LangProvider({ children }) {
   const [lang, setLangState] = useState(() => localStorage.getItem("atf_lang") || "en");
+  const [urlLang, setUrlLang] = useState(null);
   const setLang = (code) => {
     localStorage.setItem("atf_lang", code);
     setLangState(code);
@@ -28,7 +31,11 @@ export function LangProvider({ children }) {
     (key) => DICTS[lang]?.[key] ?? DICTS.en[key] ?? key,
     [lang]
   );
-  return <LangCtx.Provider value={{ lang, setLang, t }}>{children}</LangCtx.Provider>;
+  const lp = useCallback(
+    (path) => (urlLang ? `/${urlLang}${path === "/" ? "" : path}` : path),
+    [urlLang]
+  );
+  return <LangCtx.Provider value={{ lang, setLang, t, lp, urlLang, setUrlLang }}>{children}</LangCtx.Provider>;
 }
 
 export const useT = () => useContext(LangCtx);

@@ -207,7 +207,7 @@ class AttributionIn(BaseModel):
 
 class OrderCreateIn(BaseModel):
     tier_id: str
-    quantity: int = Field(ge=1, le=10)
+    quantity: int = Field(ge=1, le=14)
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
     phone: str = Field(min_length=6, max_length=30)
@@ -1142,8 +1142,8 @@ async def create_order(data: OrderCreateIn, request: Request):
         if tier["id"] != active_id:
             raise HTTPException(400, "This release is not on sale yet")
     if is_gold:
-        if not (4 <= data.quantity <= 10):
-            raise HTTPException(400, "Gold table requires 4–10 guests")
+        if not (4 <= data.quantity <= 14):
+            raise HTTPException(400, "Gold table requires 4–14 guests")
         tables_sold = await db.orders.count_documents({"tier_id": tier["id"], "payment_status": "paid"})
         if tables_sold >= tier["capacity"]:
             raise HTTPException(400, "Sold out")
@@ -1189,7 +1189,7 @@ async def create_order(data: OrderCreateIn, request: Request):
                 else:
                     raise HTTPException(400, "Invalid discount code")
     if is_gold:
-        amount = 15000 + 3000 * max(0, data.quantity - 6)
+        amount = 3999 + 899 * data.quantity
         unit_price = round(amount / data.quantity)
     else:
         amount = unit_price * data.quantity
@@ -1425,7 +1425,7 @@ class ContactIn(BaseModel):
 
 @api_router.post("/contact")
 async def contact(data: ContactIn):
-    doc = {"id": new_id(), **data.model_dump(), "created_at": utcnow().isoformat()}
+    doc = {"id": new_id(), **data.model_dump(), "status": "new", "removed": False, "created_at": utcnow().isoformat()}
     await db.messages.insert_one(doc)
     doc.pop("_id", None)
     return doc
@@ -1444,7 +1444,7 @@ class ReservationIn(BaseModel):
 async def create_reservation(data: ReservationIn):
     if "mainstream" in (data.floor or "").lower():
         raise HTTPException(400, "This floor is not available for VIP table reservations")
-    doc = {"id": new_id(), "topic": "VIP Table Reservation", **data.model_dump(), "created_at": utcnow().isoformat()}
+    doc = {"id": new_id(), "topic": "VIP Table Reservation", **data.model_dump(), "status": "new", "removed": False, "created_at": utcnow().isoformat()}
     await db.messages.insert_one(doc)
     doc.pop("_id", None)
     return {"ok": True, "id": doc["id"]}
@@ -1764,6 +1764,49 @@ async def resend_ticket_email(order_id: str, admin=Depends(get_current_admin)):
 @api_router.get("/admin/messages")
 async def admin_messages(admin=Depends(get_current_admin)):
     return await db.messages.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+
+
+MESSAGE_STATUSES = {"new", "contacted", "confirmed", "declined"}
+
+
+class MessageStatusIn(BaseModel):
+    status: str
+
+
+@api_router.put("/admin/messages/{message_id}")
+async def admin_message_status(message_id: str, data: MessageStatusIn, admin=Depends(get_current_admin)):
+    status = data.status.strip().lower()
+    if status not in MESSAGE_STATUSES:
+        raise HTTPException(400, "Invalid status")
+    r = await db.messages.update_one(
+        {"id": message_id},
+        {"$set": {"status": status, "updated_at": utcnow().isoformat()}},
+    )
+    if not r.matched_count:
+        raise HTTPException(404, "Message not found")
+    return {"ok": True, "status": status}
+
+
+@api_router.post("/admin/messages/{message_id}/remove")
+async def admin_message_remove(message_id: str, admin=Depends(get_current_admin)):
+    r = await db.messages.update_one(
+        {"id": message_id},
+        {"$set": {"removed": True, "updated_at": utcnow().isoformat()}},
+    )
+    if not r.matched_count:
+        raise HTTPException(404, "Message not found")
+    return {"ok": True, "removed": True}
+
+
+@api_router.post("/admin/messages/{message_id}/restore")
+async def admin_message_restore(message_id: str, admin=Depends(get_current_admin)):
+    r = await db.messages.update_one(
+        {"id": message_id},
+        {"$set": {"removed": False, "updated_at": utcnow().isoformat()}},
+    )
+    if not r.matched_count:
+        raise HTTPException(404, "Message not found")
+    return {"ok": True, "removed": False}
 
 
 class EventIn(BaseModel):

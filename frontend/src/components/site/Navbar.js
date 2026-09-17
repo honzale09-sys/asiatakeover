@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, Globe } from "lucide-react";
-import { useT, LANGS } from "@/i18n";
+import { useT, LANGS, LANG_CODES } from "@/i18n";
 
 const linkCls =
   "font-mono2 text-[10px] sm:text-xs uppercase tracking-[0.2em] sm:tracking-[0.25em] text-white/70 hover:text-white transition-colors";
@@ -9,6 +9,15 @@ const linkCls =
 export function LangPicker({ mobile = false }) {
   const { lang, setLang } = useT();
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const pick = (code) => {
+    const seg = pathname.split("/")[1] || "";
+    const base = LANG_CODES.includes(seg) ? pathname.slice(seg.length + 1) || "/" : pathname;
+    setLang(code);
+    navigate(`/${code}${base === "/" ? "" : base}`);
+    setOpen(false);
+  };
   return (
     <div className="relative" data-testid={mobile ? "lang-picker-mobile" : "lang-picker"}>
       <button
@@ -24,10 +33,7 @@ export function LangPicker({ mobile = false }) {
           {LANGS.map((l) => (
             <button
               key={l.code}
-              onClick={() => {
-                setLang(l.code);
-                setOpen(false);
-              }}
+              onClick={() => pick(l.code)}
               data-testid={`lang-option-${l.code}`}
               className={`block w-full text-left px-4 py-2 font-mono2 text-xs uppercase tracking-[0.15em] transition-colors ${
                 lang === l.code ? "text-[#FF6A00]" : "text-white/70 hover:text-white"
@@ -44,15 +50,15 @@ export function LangPicker({ mobile = false }) {
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
-  const { t } = useT();
+  const { t, lp } = useT();
   return (
     <header className="absolute top-0 left-0 right-0 z-40" data-testid="navbar">
       <div className="px-4 sm:px-10 h-16 flex items-center justify-between sm:grid sm:grid-cols-[1fr_auto_1fr]">
         <nav className="hidden sm:flex items-center gap-8 justify-start sm:order-1">
-          <Link to="/tickets" data-testid="nav-events-link" className={linkCls}>
+          <Link to={lp("/tickets")} data-testid="nav-events-link" className={linkCls}>
             {t("nav.events")}
           </Link>
-          <Link to="/gallery" data-testid="nav-gallery-link" className={linkCls}>
+          <Link to={lp("/gallery")} data-testid="nav-gallery-link" className={linkCls}>
             {t("nav.gallery")}
           </Link>
         </nav>
@@ -64,7 +70,7 @@ export default function Navbar() {
           <img src="/assets/logo-atf-round.jpg" alt="ASIA TAKEOVER" className="h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover" />
         </button>
         <nav className="hidden sm:flex items-center gap-8 justify-end sm:order-3">
-          <Link to="/contact" data-testid="nav-contact-link" className={linkCls}>
+          <Link to={lp("/contact")} data-testid="nav-contact-link" className={linkCls}>
             {t("nav.contact")}
           </Link>
           <LangPicker />
@@ -83,13 +89,13 @@ export default function Navbar() {
       </div>
       {open && (
         <div className="sm:hidden glass border-t border-white/10 px-6 py-5 flex flex-col gap-5" data-testid="nav-mobile-menu">
-          <Link to="/tickets" onClick={() => setOpen(false)} data-testid="nav-mobile-events-link" className={linkCls}>
+          <Link to={lp("/tickets")} onClick={() => setOpen(false)} data-testid="nav-mobile-events-link" className={linkCls}>
             {t("nav.events")}
           </Link>
-          <Link to="/gallery" onClick={() => setOpen(false)} data-testid="nav-mobile-gallery-link" className={linkCls}>
+          <Link to={lp("/gallery")} onClick={() => setOpen(false)} data-testid="nav-mobile-gallery-link" className={linkCls}>
             {t("nav.gallery")}
           </Link>
-          <Link to="/contact" onClick={() => setOpen(false)} data-testid="nav-mobile-contact-link" className={linkCls}>
+          <Link to={lp("/contact")} onClick={() => setOpen(false)} data-testid="nav-mobile-contact-link" className={linkCls}>
             {t("nav.contact")}
           </Link>
         </div>
