@@ -1,0 +1,27 @@
+{
+  "summary": "End-to-end frontend testing of 4 features (Admin Messages filters+status+remove/restore, language-prefixed URLs, checkout promo APPLY button, VIP Gold table repricing 4-14 guests). All flows pass. Mobile filter bar responsive at 390px. No critical bugs found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/vi (Vietnamese)", "issues": ["<html> lang attribute stays 'en' on /vi/* pages — cosmetic/a11y, ticket tier copy 'STANDARD TICKET / Access to all 3 stages' appears in English on /vi/tickets (likely because tier titles/perks are data-driven, not translated). Not blocking; verify if intentional."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: verify whether tier titles/perk copy on /vi/tickets should be localized (currently in English)",
+    "Optional: set document.documentElement.lang per URL prefix for a11y/SEO"
+  ],
+  "critical_code_review_comments": [
+    "Admin.js MessagesTab file (~700+ lines) — consider extracting filter bar + card into subcomponents",
+    "Sort option values use 'guests-asc'/'guests-desc' (dashes) — good, consistent with data-testid style"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (main agent ran 49 pytest OK)", "frontend": "100% (all requested flows)"},
+  "seed_data_creation": "Reused existing 'TEST RESERVE 61859C' record; changed its status to contacted, removed then restored — final state contacted+active",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Feature verification done: (1) Admin Messages: all 7 filter testids present, floor/status/guests-range/search filters work individually and combine, sort guests-asc/guests-desc reorder correctly (verified UI values), status change from new->contacted saves & persists across reload, remove hides from active list, Removed filter shows Restore, Restore preserves status. Mobile at 390px filters wrap cleanly, no horizontal overflow. (2) Language URLs: /vi renders, navbar Tickets link -> /vi/tickets, refresh persists, /faq (with saved vi) redirects to /vi/faq, /en works, /admin NOT redirected, invalid /xx/tickets falls back to /tickets. (3) Promo APPLY: MZYPL5BKOD applies 95% off, 1 qty 499->25 Kč, 2 qty ->50 Kč, invalid code shows no applied note, editing code clears applied state, Enter key triggers apply. promo-applied-note testid present. (4) Gold card: 'gold-price' shows exact '3999 Kč table fee + 899 Kč per person', 'Only 2 tables available' badge, 'Table close to the stage' perk, no '6 guests included' / '+3 000' copy. Gold checkout: 11 options 4..14 with totals 7 595 / 9 393 / 16 585 Kč for 4/6/14, pay button matches, no promo field in Gold checkout.",
+  "rca of the issue": "n/a — no issues"
+}

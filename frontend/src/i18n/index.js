@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import en from "./en";
 import vi from "./vi";
 import mn from "./mn";
@@ -27,6 +27,9 @@ export function LangProvider({ children }) {
     localStorage.setItem("atf_lang", code);
     setLangState(code);
   };
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
   const t = useCallback(
     (key) => DICTS[lang]?.[key] ?? DICTS.en[key] ?? key,
     [lang]
