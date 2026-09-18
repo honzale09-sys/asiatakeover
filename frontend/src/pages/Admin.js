@@ -894,7 +894,7 @@ function MessagesTab() {
 
 function AmbassadorsTab() {
   const [list, setList] = useState([]);
-  const [form, setForm] = useState({ name: "", instagram: "", email: "", code: "" });
+  const [form, setForm] = useState({ name: "", instagram: "", email: "", code: "", discount: "50" });
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const load = () => api.get("/admin/ambassadors").then((r) => setList(r.data)).catch((e) => toast.error(formatError(e)));
@@ -908,16 +908,16 @@ function AmbassadorsTab() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.post("/admin/ambassadors", { ...form, code: form.code || null });
+      await api.post("/admin/ambassadors", { ...form, code: form.code || null, discount_czk: Number(form.discount) || 50 });
       toast.success("Ambassador created");
-      setForm({ name: "", instagram: "", email: "", code: "" });
+      setForm({ name: "", instagram: "", email: "", code: "", discount: "50" });
       load();
     } catch (err) { toast.error(formatError(err)); } finally { setSaving(false); }
   };
 
   const saveEdit = async (id) => {
     try {
-      await api.put(`/admin/ambassadors/${id}`, editing);
+      await api.put(`/admin/ambassadors/${id}`, { ...editing, discount_czk: Number(editing.discount_czk) || undefined });
       toast.success("Saved");
       setEditing(null);
       load();
@@ -964,6 +964,7 @@ function AmbassadorsTab() {
           <input placeholder="Instagram (e.g. @handle)" className={inputCls} value={form.instagram} onChange={(e) => setForm({ ...form, instagram: e.target.value })} data-testid="amb-instagram-input" />
           <input required type="email" placeholder="Email" className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="amb-email-input" />
           <input placeholder="Personal discount code (optional — auto)" className={inputCls} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} data-testid="amb-code-input" />
+          <input required type="number" min="1" max="2000" placeholder="Discount amount (CZK)" className={inputCls} value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} data-testid="amb-discount-input" />
           <button disabled={saving} data-testid="amb-create-button" className="sm:col-span-2 bg-[#FF6A00] hover:bg-[#FF8534] disabled:opacity-50 text-white font-display font-bold uppercase text-xs py-3 rounded-full transition-colors">
             {saving ? "Creating…" : "Create Ambassador"}
           </button>
@@ -984,7 +985,7 @@ function AmbassadorsTab() {
                   <p className="font-display font-bold text-base uppercase">{a.name} {!a.active && <span className="text-[#FF0055] text-xs">(INACTIVE)</span>}</p>
                   <p className="font-mono2 text-[11px] text-slate-500">{a.instagram || "—"} · {a.email}</p>
                   <p className="font-mono2 text-[11px] text-[#00F0FF] mt-1">
-                    Code: <span className="text-white">{a.code}</span> · Sales: {a.sales}/10
+                    Code: <span className="text-white">{a.code}</span> · <span data-testid={`amb-discount-${a.code}`}>−{a.discount_czk ?? 50} Kč / ticket</span> · Sales: {a.sales}/10
                   </p>
                   {a.fifty && (
                     <p className="font-mono2 text-[11px] mt-1" data-testid={`amb-fifty-${a.code}`}>
@@ -1007,6 +1008,7 @@ function AmbassadorsTab() {
                   <input className={inputCls} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} data-testid="amb-edit-name" />
                   <input className={inputCls} value={editing.instagram} onChange={(e) => setEditing({ ...editing, instagram: e.target.value })} data-testid="amb-edit-instagram" />
                   <input className={inputCls} value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} data-testid="amb-edit-email" />
+                  <input type="number" min="1" max="2000" placeholder="Discount amount (CZK)" className={inputCls} value={editing.discount_czk} onChange={(e) => setEditing({ ...editing, discount_czk: e.target.value })} data-testid="amb-edit-discount" />
                   <div className="sm:col-span-3 flex gap-2">
                     <button onClick={() => saveEdit(a.id)} data-testid="amb-edit-save" className={btnCls}>Save</button>
                     <button onClick={() => setEditing(null)} className={btnCls}>Cancel</button>
@@ -1017,7 +1019,7 @@ function AmbassadorsTab() {
                   <button onClick={() => copy(a.code, "Code")} data-testid={`amb-copy-code-${a.code}`} className={btnCls}>Copy code</button>
                   <button onClick={() => copy(a.referral_url, "Link")} data-testid={`amb-copy-link-${a.code}`} className={btnCls}>Copy link</button>
                   <a href={`/api/admin/ambassadors/${a.id}/qr.png`} download data-testid={`amb-qr-${a.code}`} className={btnCls}>Download QR</a>
-                  <button onClick={() => setEditing({ id: a.id, name: a.name, instagram: a.instagram, email: a.email })} data-testid={`amb-edit-${a.code}`} className={btnCls}>Edit</button>
+                  <button onClick={() => setEditing({ id: a.id, name: a.name, instagram: a.instagram, email: a.email, discount_czk: a.discount_czk ?? 50 })} data-testid={`amb-edit-${a.code}`} className={btnCls}>Edit</button>
                   {a.std_eligible && (
                     <button onClick={() => act(a.id, "send-reward", { type: "standard" })} data-testid={`amb-send-std-${a.code}`} className={`${btnCls} border-[#00F0FF] text-[#00F0FF]`}>Send reward (Standard)</button>
                   )}

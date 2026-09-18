@@ -801,6 +801,7 @@ class AmbassadorIn(BaseModel):
     instagram: str = Field(default="", max_length=120)
     email: EmailStr
     code: Optional[str] = Field(default=None, max_length=24)
+    discount_czk: int = Field(default=50, ge=1, le=2000)
 
 
 @api_router.get("/admin/ambassadors")
@@ -819,7 +820,7 @@ async def admin_ambassador_create(data: AmbassadorIn, admin=Depends(get_current_
     now = utcnow().isoformat()
     doc = {
         "id": new_id(), "name": data.name.strip(), "instagram": data.instagram.strip(),
-        "email": data.email.lower(), "code": code,
+        "email": data.email.lower(), "code": code, "discount_czk": data.discount_czk,
         "stories_shared": 0, "active": True,
         "created_at": now, "activated_at": now,
         "reward_standard": None, "reward_vip": None, "fifty": None,
@@ -834,6 +835,7 @@ class AmbassadorEditIn(BaseModel):
     instagram: Optional[str] = None
     email: Optional[EmailStr] = None
     active: Optional[bool] = None
+    discount_czk: Optional[int] = Field(default=None, ge=1, le=2000)
 
 
 @api_router.put("/admin/ambassadors/{amb_id}")
@@ -1070,6 +1072,7 @@ async def ambassador_public_state(amb: dict) -> dict:
     return {
         **{k: v for k, v in amb.items() if k != "_id"},
         "sales": sales,
+        "discount_czk": amb.get("discount_czk", AMB_DISCOUNT_CZK),
         "uses_left": max(0, AMB_MAX_USES - sales),
         "std_eligible": sales >= 3 and not std.get("sent"),
         "vip_eligible": sales >= 5 and not vip.get("sent"),
@@ -1105,7 +1108,7 @@ async def promo_validate(code: str):
         left = max(0, AMB_MAX_USES - sales)
         if left <= 0:
             return {"valid": False, "reason": "This code has no discounted tickets left"}
-        return {"valid": True, "amount_off_czk": AMB_DISCOUNT_CZK, "uses_left": left, "ambassador": amb["name"]}
+        return {"valid": True, "amount_off_czk": amb.get("discount_czk", AMB_DISCOUNT_CZK), "uses_left": left, "ambassador": amb["name"]}
     amb2 = await db.ambassadors.find_one({"fifty.code": c, "active": True})
     if amb2:
         if amb2["fifty"].get("redeemed"):
@@ -1174,7 +1177,7 @@ async def create_order(data: OrderCreateIn, request: Request):
                     raise HTTPException(400, "This code has no discounted tickets left")
                 if data.quantity > left:
                     raise HTTPException(400, f"This code has only {left} discounted ticket(s) left")
-                unit_price = max(1, unit_price - AMB_DISCOUNT_CZK)
+                unit_price = max(1, unit_price - amb.get("discount_czk", AMB_DISCOUNT_CZK))
                 promo_code_used = c
             else:
                 amb2 = await db.ambassadors.find_one({"fifty.code": c, "active": True})
