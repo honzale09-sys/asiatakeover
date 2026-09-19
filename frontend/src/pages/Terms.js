@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 const SECTIONS = [
   {
     title: "1. Identifikace prodávajícího",
-    body: "Prodávajícím a pořadatelem akce ASIA TAKEOVER FESTIVAL je podnikatel NGUYEN TRUONG AN, bydlištěm Benkova 177/6, Chodov, Praha 11, IČO: 22156879. Kontakt: e-mail hello@asiatakeover.com. Akce se koná 27. září 2026 v klubu DUPLEX, Václavské náměstí 831/21, 110 00 Praha 1. Tyto obchodní podmínky upravují vztah mezi prodávajícím a zákazníkem při nákupu vstupenek prostřednictvím webu asiatakeover.com.",
+    body: "Prodávajícím a pořadatelem akce ASIA TAKEOVER FESTIVAL je podnikatel NGUYEN TRUONG AN, IČO: 22156879. Kontakt: e-mail hello@asiatakeover.com. Akce se koná 27. září 2026 v klubu DUPLEX, Václavské náměstí 831/21, 110 00 Praha 1. Tyto obchodní podmínky upravují vztah mezi prodávajícím a zákazníkem při nákupu vstupenek prostřednictvím webu asiatakeover.com.",
   },
   {
     title: "2. Předmět smlouvy",
@@ -62,7 +62,6 @@ export default function Terms() {
           <p className="font-mono2 text-[11px] uppercase tracking-[0.2em] text-slate-500 mb-2">Prodávající / pořadatel</p>
           <p className="text-sm text-slate-300 leading-relaxed">
             NGUYEN TRUONG AN<br />
-            Benkova 177/6, Chodov, Praha 11<br />
             IČO: 22156879<br />
             E-mail: hello@asiatakeover.com<br />
             Místo konání: DUPLEX, Václavské náměstí 831/21, 110 00 Praha 1

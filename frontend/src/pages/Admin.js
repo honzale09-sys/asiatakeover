@@ -168,6 +168,7 @@ function OverviewTab() {
 function OrdersTab() {
   const [orders, setOrders] = useState([]);
   const [q, setQ] = useState("");
+  const [cat, setCat] = useState("all");
   const [showAbandoned, setShowAbandoned] = useState(false);
   const [ambNames, setAmbNames] = useState({});
   const load = (incl = showAbandoned) =>
@@ -223,7 +224,15 @@ function OrdersTab() {
     }
   };
 
+  const catOf = (o) => {
+    const n = (o.tier_name || "").toLowerCase();
+    if (n.includes("gold")) return "gold";
+    if (n.includes("vip")) return "vip";
+    return "standard";
+  };
+
   const filtered = orders.filter((o) => {
+    if (cat !== "all" && catOf(o) !== cat) return false;
     const hay = `${o.buyer_name} ${o.buyer_email} ${o.tier_name} ${o.tickets.map((t) => t.code).join(" ")}`.toLowerCase();
     return hay.includes(q.toLowerCase());
   });
@@ -253,6 +262,17 @@ function OrdersTab() {
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
+        <select
+          data-testid="orders-category-filter"
+          className={`${inputCls} !w-auto`}
+          value={cat}
+          onChange={(e) => setCat(e.target.value)}
+        >
+          <option value="all">All</option>
+          <option value="standard">Standard Ticket</option>
+          <option value="vip">VIP Table Ticket</option>
+          <option value="gold">VIP Gold Table Ticket</option>
+        </select>
         <button
           onClick={exportCsv}
           data-testid="orders-export-button"

@@ -51,7 +51,7 @@ export default function ContactPage() {
           {t("contact.note")}
         </p>
         <p className="font-mono2 text-[11px] text-slate-600 mt-6" data-testid="contact-company-info">
-          Provozovatel: NGUYEN TRUONG AN · Benkova 177/6, Chodov, Praha 11 · IČO 22156879 · hello@asiatakeover.com
+          Provozovatel: NGUYEN TRUONG AN · IČO 22156879 · hello@asiatakeover.com
         </p>
       </main>
     </div>

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 const SECTIONS = [
   {
     title: "Správce osobních údajů",
-    body: "Správcem osobních údajů je pořadatel akce ASIA TAKEOVER FESTIVAL — NGUYEN TRUONG AN, Benkova 177/6, Chodov, Praha 11, IČO: 22156879, kontakt: hello@asiatakeover.com.",
+    body: "Správcem osobních údajů je pořadatel akce ASIA TAKEOVER FESTIVAL — NGUYEN TRUONG AN, IČO: 22156879, kontakt: hello@asiatakeover.com.",
   },
   {
     title: "Jaké údaje zpracováváme a proč",
