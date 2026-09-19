@@ -1521,8 +1521,9 @@ async def scan_checkin(data: ScanIn, admin=Depends(get_current_admin)):
 @api_router.get("/admin/stats")
 async def admin_stats(admin=Depends(get_current_admin)):
     orders = await db.orders.find({}, {"_id": 0}).to_list(100000)
-    tickets_sold = await db.tickets.count_documents({"guest_list": {"$ne": True}})
-    checked_in = await db.tickets.count_documents({"status": "used", "guest_list": {"$ne": True}})
+    # "Tickets sold" = every QR ticket ever generated (paid, guest list, ambassador rewards, comps)
+    tickets_sold = await db.tickets.count_documents({})
+    checked_in = await db.tickets.count_documents({"status": "used"})
     tiers = await db.ticket_tiers.find({}, {"_id": 0}).to_list(100)
     tier_price = {t["id"]: t["price_czk"] for t in tiers}
 
@@ -1598,6 +1599,24 @@ async def admin_stats(admin=Depends(get_current_admin)):
                 "comp_nominal_czk": comp_nominal,
                 "promo_discount_czk": promo_discount,
             }}
+
+
+@api_router.post("/admin/tickets/{code}/reset-checkin")
+async def admin_reset_checkin(code: str, admin=Depends(get_current_admin)):
+    """Undo an accidental check-in: ticket becomes valid again. Order/payment untouched."""
+    c = normalize_code(code)
+    t = await db.tickets.find_one({"code": c})
+    if not t:
+        raise HTTPException(404, "Ticket not found")
+    if t.get("status") != "used":
+        raise HTTPException(400, "Ticket is not checked in")
+    await db.tickets.update_one(
+        {"code": c},
+        {"$set": {"status": "valid", "checked_in_at": None, "checked_in_by": None}},
+    )
+    logger.warning("ADMIN %s reset check-in for ticket %s", admin.get("email"), c)
+    return {"ok": True, "code": c, "status": "valid"}
+
 
 
 class VipGuestIn(BaseModel):
