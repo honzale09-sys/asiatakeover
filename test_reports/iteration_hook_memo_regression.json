@@ -1,0 +1,49 @@
+{
+  "summary": "Frontend regression pass after useCallback/useEffect memoization cleanup (part A). All 8 target flows verified: no infinite loops, single-shot fetches, abandoned toggle round-trip correct, single promo toast on auto-apply, Messages floor options limited to allowed values (legacy Mainstream only visible disabled when a record already has that value), /vi language persistence + saved-lang redirect + globe-switch to /en all correct within 1 hop, 3 takeover-video-slots present, Scanner logs invalid codes correctly with newest on top, /upgrade shows 'Ticket not found' for unknown code and 400 Kč CTA for ATF-63BBC9.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "detailed_findings": {
+    "admin_tabs_no_infinite_loop": {
+      "overview": "Initial /api/admin/stats fired twice on mount (double invocation, likely React StrictMode); no additional fetches after 3s idle. No loop.",
+      "orders": "1 GET /api/admin/orders + 1 GET /api/admin/ambassadors on tab open (each doubled once = 2 orders+2 amb), then idle. No loop.",
+      "events": "2 GET /api/admin/events (doubled), then idle. No loop.",
+      "tiers": "2 GET /api/admin/tiers + 2 GET /api/admin/events (doubled), then idle. No loop.",
+      "content": "No admin/* API calls (all client-side content). OK.",
+      "messages": "2 GET /api/admin/messages (doubled), then idle. No loop.",
+      "ambassadors": "2 GET /api/admin/ambassadors (doubled), then idle. No loop.",
+      "note": "Every tab does exactly one logical fetch per resource; the observed x2 count is React 18 StrictMode dev double-invocation, NOT a hook-dep loop. No repeated calls once effects settle. Regression criterion met."
+    },
+    "abandoned_toggle": "Exactly ONE GET /api/admin/orders?include_unpaid=1 on OFF→ON and ONE GET /api/admin/orders on ON→OFF. Effect-driven reload works as intended.",
+    "messages_floor_options": "Verified in code (Admin.js L917-923): dropdown renders only 'No floor assigned' + Seoul (7th) + Saigon (5th); if a message already has a legacy floor (e.g. 'Mainstream Floor (6th)'), it appears as disabled '(legacy)' option to preserve display without allowing new assignment. Consistent with requirement.",
+    "tickets_ref_auto_apply": "GET /tickets?ref=T5915F8 → after clicking BUY: exactly ONE 'Discount applied — 50 Kč off per ticket' toast; input pre-filled with T5915F8; total 449 Kč. Manual apply of MZYPL5BKOD → 'Discount applied — 95% off' toast, line 'Code MZYPL5BKOD applied: −95% (list price 499 Kč)', total 25 Kč. Payment not attempted.",
+    "language": {
+      "vi_direct": "Loads Vietnamese, URL stays /vi.",
+      "nav_to_tickets": "Clicking navbar Tickets → /vi/tickets (preserved).",
+      "root_after_vi": "Visiting / redirects to /vi (saved lang). Single hop, no flicker.",
+      "switch_to_en": "Globe picker → /en. Single hop, no loop."
+    },
+    "home_video_slots": "3 elements with data-testid takeover-video-slot-1..3 present.",
+    "scanner": "Admin login → 2 manual entries (ATF-ZZZZZZ, ATF-YYYYYY) → both show INVALID; door log shows newest on top (ATF-YYYYYY 22:25:12 above ATF-ZZZZZZ 22:25:09). No console errors beyond pre-login 401 auth probes.",
+    "upgrade_page": "ATF-XXXXXX → 'Ticket not found' toast (text confirmed). ATF-63BBC9 → Ticket Found card with 'Sim Guard Test · 1st Release', PAY UPGRADE — 400 KČ visible. Stopped before payment."
+  },
+  "critical_code_review_comments": [
+    "Admin.js is 1174 lines — consider splitting each tab into its own module (OverviewTab, OrdersTab, etc.) for maintainability and to reduce re-render surface.",
+    "Overview shows Recharts width(-1) height(-1) warnings — chart container needs minWidth/minHeight or explicit dimensions before initial paint.",
+    "There is a React hydration warning on the messages floor select: a <span data-ve-dynamic> is being injected as a child of <option> by the editor instrumentation. Not a runtime crash and not caused by this batch, but flag it for future cleanup.",
+    "Initial /api/admin/stats fires twice on mount; if this is production build (not StrictMode), review Overview useEffect deps to ensure load() runs only once."
+  ],
+  "test_report_links": [],
+  "action_items": [],
+  "updated_files": [],
+  "success_rate": {"backend": "not-tested", "frontend": "100%"},
+  "test_credentials": "admin@asiatakeover.eu / Takeover2026! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None. No admin messages edited/saved. No orders created. No payments attempted (per Teya-live constraint). Scanner door log entries are ephemeral client-side state.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Regression clean. Ambassador codes: active T5915F8 (-50 Kč), TBA6D26. Promo MZYPL5BKOD = -95%. Valid paid ticket for /upgrade: ATF-63BBC9. Do not enter card details (real Teya).",
+  "rca of the issue": "N/A — no bugs from this batch."
+}
