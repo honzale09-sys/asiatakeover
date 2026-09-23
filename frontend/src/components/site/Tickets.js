@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -86,7 +86,7 @@ function CheckoutModal({ tier, event, onClose, refCode }) {
     : tier.price_czk;
   const totalPrice = isGold ? 3999 + 899 * qty : unitPrice * qty;
 
-  const applyPromo = async (codeOverride) => {
+  const applyPromo = useCallback(async (codeOverride) => {
     const raw = (codeOverride ?? promoInput).trim();
     if (!raw) return;
     try {
@@ -107,10 +107,11 @@ function CheckoutModal({ tier, event, onClose, refCode }) {
         setPromoApplied(null);
         toast.error(r.data.reason || "Invalid discount code");
       }
-    } catch {
+    } catch (e) {
+      console.warn("Checkout: promo validation failed", e);
       toast.error("Could not validate the code — try again");
     }
-  };
+  }, [promoInput]);
 
   const refAutoApplied = useRef(false);
   useEffect(() => {
@@ -118,7 +119,7 @@ function CheckoutModal({ tier, event, onClose, refCode }) {
       refAutoApplied.current = true;
       applyPromo(refCode);
     }
-  }, [refCode]);
+  }, [refCode, isGold, applyPromo]);
 
   useEffect(() => {
     trackEvent("InitiateCheckout", {
@@ -152,7 +153,7 @@ function CheckoutModal({ tier, event, onClose, refCode }) {
     })();
     return () => {
       cancelled = true;
-      try { el && el.unmount(); } catch { /* noop */ }
+      try { el && el.unmount(); } catch (e) { console.warn("Checkout: Teya unmount failed", e); }
     };
   }, [step, payment]);
 

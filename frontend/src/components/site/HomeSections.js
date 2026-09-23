@@ -30,7 +30,7 @@ export function WatchTheTakeover() {
         <SectionHead eyebrow={t("home.watchEyebrow")} titleA={t("home.watchA")} titleB={t("home.watchB")} testid="watch-the-takeover-title" />
         <div className="grid grid-cols-3 gap-3 sm:gap-4 max-w-3xl">
           {TAKEOVER_VIDEOS.map((v, i) => (
-            <div key={i} className="aspect-[9/16] rounded-2xl overflow-hidden border border-white/10 bg-black" data-testid={`takeover-video-slot-${i + 1}`}>
+            <div key={v.src} className="aspect-[9/16] rounded-2xl overflow-hidden border border-white/10 bg-black" data-testid={`takeover-video-slot-${i + 1}`}>
               <video
                 src={v.src}
                 poster={v.poster}

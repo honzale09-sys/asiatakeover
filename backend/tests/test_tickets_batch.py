@@ -4,6 +4,9 @@ import os
 import uuid
 import pytest
 import requests
+from dotenv import dotenv_values
+
+_ENV = {**dotenv_values(os.path.join(os.path.dirname(__file__), "..", ".env")), **os.environ}
 from pathlib import Path
 
 def _load_frontend_env():
@@ -17,8 +20,8 @@ def _load_frontend_env():
 _load_frontend_env()
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
-ADMIN_EMAIL = "admin@asiatakeover.eu"
-ADMIN_PASSWORD = "Takeover2026!"
+ADMIN_EMAIL = _ENV["ADMIN_EMAIL"]
+ADMIN_PASSWORD = _ENV["ADMIN_PASSWORD"]
 
 
 @pytest.fixture(scope="module")

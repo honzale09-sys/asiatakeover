@@ -3,9 +3,12 @@ import os
 import uuid
 import pytest
 import requests
+from dotenv import dotenv_values
+
+_ENV = {**dotenv_values(os.path.join(os.path.dirname(__file__), "..", ".env")), **os.environ}
 
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or "https://asia-takeover-fest.preview.emergentagent.com").rstrip("/")
-ADMIN = {"email": "admin@asiatakeover.eu", "password": "Takeover2026!"}
+ADMIN = {"email": _ENV["ADMIN_EMAIL"], "password": _ENV["ADMIN_PASSWORD"]}
 
 
 @pytest.fixture(scope="module")

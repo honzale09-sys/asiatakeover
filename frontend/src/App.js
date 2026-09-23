@@ -53,7 +53,7 @@ function LangSync() {
     if (saved && saved !== "en" && LANG_CODES.includes(saved)) {
       navigate(`/${saved}${pathname === "/" ? "" : pathname}`, { replace: true });
     }
-  }, [pathname]);
+  }, [pathname, lang, navigate, setLang, setUrlLang]);
   return null;
 }
 

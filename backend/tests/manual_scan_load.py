@@ -5,9 +5,12 @@ import statistics
 import threading
 import time
 import requests
+from dotenv import dotenv_values
+
+_ENV = {**dotenv_values(os.path.join(os.path.dirname(__file__), "..", ".env")), **os.environ}
 
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or "https://asia-takeover-fest.preview.emergentagent.com").rstrip("/")
-ADMIN = {"email": "admin@asiatakeover.eu", "password": "Takeover2026!"}
+ADMIN = {"email": _ENV["ADMIN_EMAIL"], "password": _ENV["ADMIN_PASSWORD"]}
 UA = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"}
 
 s = requests.Session()

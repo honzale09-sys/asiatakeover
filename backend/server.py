@@ -1267,6 +1267,7 @@ async def create_order(data: OrderCreateIn, request: Request):
         "client_ip": ip,
         "user_agent": request.headers.get("user-agent"),
     }
+    payment_url = mode = None
     if teya_configured():
         s = await teya_create_session(order)
         order["teya_session_id"] = str(s["session_id"])
@@ -1388,6 +1389,7 @@ async def upgrade_create(data: UpgradeCreateIn, request: Request):
         "client_ip": ip,
         "user_agent": request.headers.get("user-agent"),
     }
+    payment_url = mode = None
     if teya_configured():
         s = await teya_create_session(order)
         order["teya_session_id"] = str(s["session_id"])

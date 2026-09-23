@@ -16,7 +16,9 @@ function beep(ok) {
     g.gain.setValueAtTime(0.15, ctx.currentTime);
     o.start();
     o.stop(ctx.currentTime + (ok ? 0.15 : 0.4));
-  } catch {}
+  } catch (e) {
+    console.warn("Scanner: audio beep unavailable", e);
+  }
 }
 
 const inputCls =
@@ -41,7 +43,9 @@ export default function Scanner() {
           const r = await api.get("/auth/me");
           setUser(r.data);
           return;
-        } catch {}
+        } catch (err) {
+          console.warn("Scanner: session refresh failed", err);
+        }
       }
       setUser(false);
     });
@@ -49,7 +53,7 @@ export default function Scanner() {
 
   useEffect(
     () => () => {
-      scannerRef.current?.stop().catch(() => {});
+      scannerRef.current?.stop().catch((e) => console.warn("Scanner: camera stop on unmount failed", e));
     },
     []
   );
@@ -82,7 +86,7 @@ export default function Scanner() {
       beep(ok);
       setStats((s) => ({ ...s, scans: s.scans + 1 }));
       setLog((l) =>
-        [{ code: raw.trim().toUpperCase(), result: r.data.result, at: new Date().toLocaleTimeString("cs-CZ") }, ...l].slice(0, 15)
+        [{ id: `${Date.now()}-${l.length}`, code: raw.trim().toUpperCase(), result: r.data.result, at: new Date().toLocaleTimeString("cs-CZ") }, ...l].slice(0, 15)
       );
     } catch (e) {
       if (e?.response?.status === 401) setUser(false);
@@ -137,7 +141,9 @@ export default function Scanner() {
   const stopCamera = async () => {
     try {
       await scannerRef.current?.stop();
-    } catch {}
+    } catch (e) {
+      console.warn("Scanner: camera stop failed", e);
+    }
     scannerRef.current = null;
     setCameraOn(false);
   };
@@ -363,7 +369,7 @@ export default function Scanner() {
             <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-slate-500 mb-3">Door log</p>
             <div className="space-y-2 max-h-56 overflow-y-auto">
               {log.map((l, i) => (
-                <div key={i} className="flex items-center justify-between font-mono2 text-xs" data-testid={`scan-log-entry-${i}`}>
+                <div key={l.id} className="flex items-center justify-between font-mono2 text-xs" data-testid={`scan-log-entry-${i}`}>
                   <span className="text-slate-300">{l.code}</span>
                   <span className={l.result === "valid" ? "text-emerald-400" : l.result === "used" ? "text-[#FFE600]" : "text-[#FF0055]"}>
                     {l.result.toUpperCase()}

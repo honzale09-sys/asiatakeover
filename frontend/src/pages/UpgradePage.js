@@ -40,7 +40,7 @@ export default function UpgradePage() {
     })();
     return () => {
       cancelled = true;
-      try { el && el.unmount(); } catch { /* noop */ }
+      try { el && el.unmount(); } catch (e) { console.warn("Upgrade: Teya unmount failed", e); }
     };
   }, [step, payment]);
 

@@ -15,7 +15,7 @@ from pymongo import MongoClient
 ENV = dotenv_values("/app/backend/.env")
 FENV = dotenv_values("/app/frontend/.env")
 BASE_URL = FENV["REACT_APP_BACKEND_URL"].rstrip("/")
-ADMIN = {"email": "admin@asiatakeover.eu", "password": "Takeover2026!"}
+ADMIN = {"email": ENV["ADMIN_EMAIL"], "password": ENV["ADMIN_PASSWORD"]}
 UA = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"}
 N_TICKETS = int(os.environ.get("N_TICKETS", "1000"))
 PHONES = 4

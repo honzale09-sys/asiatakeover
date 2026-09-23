@@ -1,11 +1,14 @@
 """Tests for admin delete-order endpoint and related content changes."""
 import os
 import requests
+from dotenv import dotenv_values
+
+_ENV = {**dotenv_values(os.path.join(os.path.dirname(__file__), "..", ".env")), **os.environ}
 import pytest
 
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or "https://asia-takeover-fest.preview.emergentagent.com").rstrip("/")
-ADMIN_EMAIL = "admin@asiatakeover.eu"
-ADMIN_PASSWORD = "Takeover2026!"
+ADMIN_EMAIL = _ENV["ADMIN_EMAIL"]
+ADMIN_PASSWORD = _ENV["ADMIN_PASSWORD"]
 GA_TIER_ID = "7425d4a5cf0349e39ca3c37bacefaaf7"
 
 

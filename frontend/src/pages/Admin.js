@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -90,8 +90,8 @@ function VipGuestListCard({ stats, onSent }) {
 
 function OverviewTab() {
   const [stats, setStats] = useState(null);
-  const load = () => api.get("/admin/stats").then((r) => setStats(r.data)).catch((e) => toast.error(formatError(e)));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/admin/stats").then((r) => setStats(r.data)).catch((e) => toast.error(formatError(e))), []);
+  useEffect(() => { load(); }, [load]);
   if (!stats) return <p className="font-mono2 text-sm text-slate-500">Loading stats…</p>;
   return (
     <div className="space-y-8" data-testid="admin-overview">
@@ -171,10 +171,12 @@ function OrdersTab() {
   const [cat, setCat] = useState("all");
   const [showAbandoned, setShowAbandoned] = useState(false);
   const [ambNames, setAmbNames] = useState({});
-  const load = (incl = showAbandoned) =>
-    api.get(`/admin/orders${incl ? "?include_unpaid=1" : ""}`).then((r) => setOrders(r.data)).catch((e) => toast.error(formatError(e)));
+  const load = useCallback(
+    () => api.get(`/admin/orders${showAbandoned ? "?include_unpaid=1" : ""}`).then((r) => setOrders(r.data)).catch((e) => toast.error(formatError(e))),
+    [showAbandoned]
+  );
+  useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    load();
     api.get("/admin/ambassadors").then((r) => {
       const m = {};
       r.data.forEach((a) => {
@@ -185,11 +187,7 @@ function OrdersTab() {
     }).catch(() => {});
   }, []);
 
-  const toggleAbandoned = () => {
-    const next = !showAbandoned;
-    setShowAbandoned(next);
-    load(next);
-  };
+  const toggleAbandoned = () => setShowAbandoned((v) => !v);
 
   const syncPayment = async (id) => {
     try {
@@ -428,8 +426,8 @@ function EventsTab() {
   const [form, setForm] = useState(blankEvent);
   const [editingId, setEditingId] = useState(null);
 
-  const load = () => api.get("/admin/events").then((r) => setEvents(r.data)).catch((e) => toast.error(formatError(e)));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/admin/events").then((r) => setEvents(r.data)).catch((e) => toast.error(formatError(e))), []);
+  useEffect(() => { load(); }, [load]);
 
   const edit = (ev) => {
     setEditingId(ev.id);
@@ -558,15 +556,15 @@ function TiersTab() {
   const [form, setForm] = useState(blankTier);
   const [editingId, setEditingId] = useState(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     api.get("/admin/tiers").then((r) => setTiers(r.data)).catch((e) => toast.error(formatError(e)));
     api.get("/admin/events").then((r) => {
       setEvents(r.data);
       const active = r.data.find((ev) => ev.active) || r.data[0];
       if (active) setForm((f) => (f.event_id ? f : { ...f, event_id: active.id }));
-    }).catch(() => {});
-  };
-  useEffect(() => { load(); }, []);
+    }).catch((e) => console.warn("Admin tiers: events load failed", e));
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const edit = (t) => {
     setEditingId(t.id);
@@ -662,8 +660,8 @@ function ContentTab() {
         announcement: c.announcement || "", hero_sub: c.hero_sub || "",
         contact_email: c.contact_email || "", instagram: c.instagram || "",
       });
-    }).catch(() => {});
-    api.get("/gate/status").then((r) => setLockdown(r.data.enabled)).catch(() => {});
+    }).catch((e) => console.warn("Admin content: site load failed", e));
+    api.get("/gate/status").then((r) => setLockdown(r.data.enabled)).catch((e) => console.warn("Admin content: gate status failed", e));
   }, []);
 
   const save = async (e) => {
@@ -750,8 +748,8 @@ function MessagesTab() {
   const [editFloor, setEditFloor] = useState({});
   const [confirmRemove, setConfirmRemove] = useState(null);
 
-  const load = () => api.get("/admin/messages").then((r) => setMessages(r.data)).catch((e) => toast.error(formatError(e)));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/admin/messages").then((r) => setMessages(r.data)).catch((e) => toast.error(formatError(e))), []);
+  useEffect(() => { load(); }, [load]);
 
   const saveMessage = async (id) => {
     const payload = {};
@@ -951,8 +949,8 @@ function AmbassadorsTab() {
   const [form, setForm] = useState({ name: "", instagram: "", email: "", code: "", discount: "50" });
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
-  const load = () => api.get("/admin/ambassadors").then((r) => setList(r.data)).catch((e) => toast.error(formatError(e)));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/admin/ambassadors").then((r) => setList(r.data)).catch((e) => toast.error(formatError(e))), []);
+  useEffect(() => { load(); }, [load]);
 
   const copy = (text, what) => {
     navigator.clipboard.writeText(text).then(() => toast.success(`${what} copied`));

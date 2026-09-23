@@ -28,7 +28,9 @@ export default function Success() {
           try {
             const t = await api.get(`/orders/${orderId}/tickets`);
             setTickets(t.data.tickets);
-          } catch {}
+          } catch (e) {
+            console.warn("Success: tickets fetch failed", e);
+          }
           const firedKey = `atf_purchase_${orderId}`;
           if (!localStorage.getItem(firedKey)) {
             trackEvent(
@@ -50,7 +52,8 @@ export default function Success() {
         if (FINAL_FAIL.has(ps) || ps === "refunded" || ps === "partially_refunded") return;
         tries.current += 1;
         if (tries.current < 450) timer = setTimeout(poll, 4000);
-      } catch {
+      } catch (e) {
+        console.warn("Success: order status poll failed", e);
         setStatus({ payment_status: "missing" });
       }
     };

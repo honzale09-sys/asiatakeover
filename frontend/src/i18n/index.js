@@ -23,10 +23,10 @@ const LangCtx = createContext(null);
 export function LangProvider({ children }) {
   const [lang, setLangState] = useState(() => localStorage.getItem("atf_lang") || "en");
   const [urlLang, setUrlLang] = useState(null);
-  const setLang = (code) => {
+  const setLang = useCallback((code) => {
     localStorage.setItem("atf_lang", code);
     setLangState(code);
-  };
+  }, []);
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);
