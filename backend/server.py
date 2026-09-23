@@ -977,6 +977,36 @@ async def admin_ambassador_qr(amb_id: str, admin=Depends(get_current_admin)):
 
 # ---------------- fulfillment & reconciliation ----------------
 
+async def fulfill_upgrade(order: dict):
+    """Paid Standard→VIP upgrade: re-labels the EXISTING ticket to VIP (same QR code).
+    Per-tier/category sold counts move automatically because tier_id/tier_name change."""
+    code = order.get("upgrade_ticket_code")
+    t = await db.tickets.find_one({"code": code})
+    if not t:
+        logger.error("Upgrade order %s: ticket %s not found", order["id"], code)
+        return
+    if "VIP" in (t.get("tier_name") or "").upper():
+        logger.info("Upgrade order %s: ticket %s already VIP", order["id"], code)
+    else:
+        await db.tickets.update_one({"id": t["id"]}, {"$set": {
+            "tier_id": order["upgrade_vip_tier_id"],
+            "tier_name": "VIP Table Ticket",
+            "upgraded": True,
+            "upgraded_at": utcnow().isoformat(),
+            "upgrade_order_id": order["id"],
+        }})
+        t = await db.tickets.find_one({"id": t["id"]}, {"_id": 0})
+        logger.warning("Ticket %s upgraded Standard→VIP via order %s", code, order["id"])
+    await send_capi_purchase(order)
+    email_order = {**order, "tier_name": "VIP Table Ticket", "quantity": 1}
+    try:
+        html = build_ticket_email_html(email_order, [t])
+        await send_email(to=order["buyer_email"], subject="Asia Takeover — Your ticket is now VIP 🎟️", html=html)
+    except Exception as e:
+        logger.warning("Upgrade confirmation email failed for order %s: %s", order["id"], str(e)[:150])
+    logger.info("Upgrade order %s fulfilled for ticket %s", order["id"], code)
+
+
 async def fulfill_order(order_id: str):
     order = await db.orders.find_one_and_update(
         {"id": order_id, "fulfillment_status": {"$ne": "fulfilled"}},
@@ -989,6 +1019,9 @@ async def fulfill_order(order_id: str):
         return_document=ReturnDocument.AFTER,
     )
     if not order:
+        return
+    if order.get("kind") == "upgrade":
+        await fulfill_upgrade(order)
         return
     if order.get("promo_code"):
         await db.ambassadors.update_one(
@@ -1004,6 +1037,16 @@ async def fulfill_order(order_id: str):
             "holder_name": order["buyer_name"], "buyer_email": order["buyer_email"],
             "status": "valid", "created_at": utcnow().isoformat(),
             "checked_in_at": None, "checked_in_by": None,
+        })
+    if "GOLD" in (order.get("tier_name") or "").upper():
+        await db.messages.insert_one({
+            "id": new_id(), "topic": "VIP GOLD TABLE",
+            "name": order["buyer_name"], "email": order["buyer_email"],
+            "phone": order.get("buyer_phone", ""),
+            "guests": order["quantity"], "floor": "",
+            "message": f"Paid Gold table order {order['id'][:8]} · {order['amount_czk']} CZK",
+            "status": "new", "removed": False, "notes": "",
+            "order_id": order["id"], "created_at": utcnow().isoformat(),
         })
     await send_capi_purchase(order)
     asyncio.create_task(send_ticket_email_with_retry(order["id"]))
@@ -1255,6 +1298,123 @@ async def create_order(data: OrderCreateIn, request: Request):
     }
 
 
+# ---------------- ticket upgrade (Standard → VIP) ----------------
+
+UPGRADE_PRICE_CZK = 400
+
+
+class UpgradeCheckIn(BaseModel):
+    code: str
+
+
+async def upgradeable_ticket(code: str) -> dict:
+    t = await find_ticket(code)
+    if not t:
+        raise HTTPException(404, "Ticket not found — check the code")
+    ost = await order_status_for(t)
+    if t["status"] == "refunded" or ost in ("refunded", "partially_refunded"):
+        raise HTTPException(400, "This ticket was refunded")
+    if "VIP" in (t.get("tier_name") or "").upper() or t.get("guest_list"):
+        raise HTTPException(400, "This ticket is already VIP")
+    if t["status"] == "used":
+        raise HTTPException(400, "This ticket was already checked in")
+    return t
+
+
+@api_router.post("/upgrade/check")
+async def upgrade_check(data: UpgradeCheckIn):
+    t = await upgradeable_ticket(data.code)
+    return {"valid": True, "code": t["code"], "tier_name": t["tier_name"],
+            "holder_name": t.get("holder_name"), "price_czk": UPGRADE_PRICE_CZK}
+
+
+class UpgradeCreateIn(BaseModel):
+    code: str
+    name: str = Field(min_length=1, max_length=120)
+    email: EmailStr
+    phone: str = Field(min_length=6, max_length=30)
+
+
+async def current_vip_tier(event_id: str) -> dict:
+    tiers = await db.ticket_tiers.find({"event_id": event_id}).to_list(100)
+    vip = [x for x in tiers if "VIP" in x["name"].upper() and "GOLD" not in x["name"].upper()]
+    if not vip:
+        raise HTTPException(400, "No VIP tier exists")
+    vip.sort(key=lambda x: x["price_czk"])
+    for x in vip:
+        if await db.tickets.count_documents({"tier_id": x["id"]}) < x["capacity"]:
+            return x
+    return vip[-1]
+
+
+@api_router.post("/upgrade/create")
+async def upgrade_create(data: UpgradeCreateIn, request: Request):
+    ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+          or (request.client.host if request.client else "unknown"))
+    rate_limit(ip)
+    t = await upgradeable_ticket(data.code)
+    event = await db.events.find_one({"active": True}, {"_id": 0})
+    if not event:
+        raise HTTPException(404, "No active event")
+    vip_tier = await current_vip_tier(event["id"])
+    order = {
+        "id": new_id(),
+        "created_at": utcnow().isoformat(),
+        "updated_at": utcnow().isoformat(),
+        "kind": "upgrade",
+        "event_id": event["id"],
+        "event_name": event["name"],
+        "tier_id": vip_tier["id"],
+        "tier_name": "VIP Upgrade",
+        "quantity": 1,
+        "tickets_per_unit": 1,
+        "amount_czk": UPGRADE_PRICE_CZK,
+        "list_price_czk": UPGRADE_PRICE_CZK,
+        "unit_price_czk": UPGRADE_PRICE_CZK,
+        "promo_code": None,
+        "discount_percent": None,
+        "currency": "CZK",
+        "buyer_name": data.name.strip(),
+        "buyer_email": data.email.lower(),
+        "buyer_phone": data.phone.strip(),
+        "upgrade_ticket_code": t["code"],
+        "upgrade_vip_tier_id": vip_tier["id"],
+        "payment_status": "created",
+        "gopay_payment_id": None,
+        "paid_at": None,
+        "fulfillment_status": "pending",
+        "marketing_consent": False,
+        "attribution": None,
+        "client_ip": ip,
+        "user_agent": request.headers.get("user-agent"),
+    }
+    if teya_configured():
+        s = await teya_create_session(order)
+        order["teya_session_id"] = str(s["session_id"])
+        order["payment_provider"] = "teya"
+        payment_url = s["session_url"]
+        mode = "teya"
+        order["teya_session_token"] = s["session_token"]
+    elif payment_sim_allowed():
+        pid = f"SIM-{order['id']}"
+        order["gopay_payment_id"] = pid
+        payment_url = f"/pay/{order['id']}"
+        mode = "simulation"
+        await db.sim_payments.insert_one({"id": pid, "state": "CREATED", "order_id": order["id"]})
+    else:
+        raise HTTPException(503, "Online payments are temporarily unavailable")
+    await db.orders.insert_one(order)
+    logger.warning("Upgrade order %s created for ticket %s (%s)", order["id"], t["code"], data.email.lower())
+    return {
+        "order_id": order["id"],
+        "payment_url": payment_url,
+        "mode": mode,
+        "amount_czk": order["amount_czk"],
+        "currency": "CZK",
+        "session_token": order.get("teya_session_token"),
+    }
+
+
 @api_router.get("/orders/{order_id}/status")
 async def order_status(order_id: str):
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
@@ -1287,7 +1447,11 @@ async def order_tickets(order_id: str):
         raise HTTPException(404, "Order not found")
     if order.get("payment_status") not in ("paid", "paid_mock"):
         raise HTTPException(403, "Tickets are available only after the payment is confirmed")
-    tickets = await db.tickets.find({"order_id": order_id}, {"_id": 0}).to_list(50)
+    if order.get("kind") == "upgrade":
+        t = await db.tickets.find_one({"code": order.get("upgrade_ticket_code")}, {"_id": 0})
+        tickets = [t] if t else []
+    else:
+        tickets = await db.tickets.find({"order_id": order_id}, {"_id": 0}).to_list(50)
     return {"order_id": order_id, "tickets": [{**t, "qr": make_qr(t["code"])} for t in tickets]}
 
 
@@ -1789,24 +1953,37 @@ async def admin_messages(admin=Depends(get_current_admin)):
 
 
 MESSAGE_STATUSES = {"new", "contacted", "confirmed", "declined"}
+MESSAGE_FLOORS = {"Seoul Floor (7th)", "Saigon Floor (5th)", "Mainstream Floor (6th)"}
 
 
-class MessageStatusIn(BaseModel):
-    status: str
+class MessageUpdateIn(BaseModel):
+    status: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=2000)
+    floor: Optional[str] = Field(default=None, max_length=60)
 
 
 @api_router.put("/admin/messages/{message_id}")
-async def admin_message_status(message_id: str, data: MessageStatusIn, admin=Depends(get_current_admin)):
-    status = data.status.strip().lower()
-    if status not in MESSAGE_STATUSES:
-        raise HTTPException(400, "Invalid status")
-    r = await db.messages.update_one(
-        {"id": message_id},
-        {"$set": {"status": status, "updated_at": utcnow().isoformat()}},
-    )
+async def admin_message_update(message_id: str, data: MessageUpdateIn, admin=Depends(get_current_admin)):
+    upd = {}
+    if data.status is not None:
+        status = data.status.strip().lower()
+        if status not in MESSAGE_STATUSES:
+            raise HTTPException(400, "Invalid status")
+        upd["status"] = status
+    if data.notes is not None:
+        upd["notes"] = data.notes
+    if data.floor is not None:
+        if data.floor and data.floor not in MESSAGE_FLOORS:
+            raise HTTPException(400, "Invalid floor")
+        upd["floor"] = data.floor
+    if not upd:
+        raise HTTPException(400, "Nothing to update")
+    upd["updated_at"] = utcnow().isoformat()
+    upd["updated_by"] = admin.get("email")
+    r = await db.messages.update_one({"id": message_id}, {"$set": upd})
     if not r.matched_count:
         raise HTTPException(404, "Message not found")
-    return {"ok": True, "status": status}
+    return {"ok": True, **upd}
 
 
 @api_router.post("/admin/messages/{message_id}/remove")
@@ -2018,6 +2195,7 @@ async def startup():
     await db.login_attempts.create_index("identifier")
     await db.tickets.create_index("code", unique=True)
     await db.tickets.create_index("order_id")
+    await db.orders.create_index("id", unique=True)
     await db.sim_payments.create_index("id", unique=True)
     await db.meta_events.create_index("event_id", unique=True)
     await db.email_rate.create_index("key", unique=True)

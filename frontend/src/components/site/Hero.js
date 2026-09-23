@@ -85,13 +85,22 @@ export default function Hero({ event, tiers = [] }) {
           </p>
 
           {activeGA ? (
-            <Link
-              to={lp("/tickets")}
-              data-testid="buy-tickets-button"
-              className="mt-7 inline-block whitespace-nowrap bg-[#FF6A00] hover:bg-[#FF8534] active:scale-95 text-white font-display font-bold uppercase text-xs sm:text-base tracking-[0.12em] sm:tracking-[0.15em] px-8 sm:px-12 py-4 rounded-full shadow-[0_0_24px_rgba(255,106,0,0.3)] transition-all duration-300 min-h-[54px]"
-            >
-              {t("hero.getTickets")}
-            </Link>
+            <div className="mt-7 flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+              <Link
+                to={lp("/tickets")}
+                data-testid="buy-tickets-button"
+                className="inline-block whitespace-nowrap bg-[#FF6A00] hover:bg-[#FF8534] active:scale-95 text-white font-display font-bold uppercase text-xs sm:text-base tracking-[0.12em] sm:tracking-[0.15em] px-8 sm:px-12 py-4 rounded-full shadow-[0_0_24px_rgba(255,106,0,0.3)] transition-all duration-300 min-h-[54px]"
+              >
+                {t("hero.getTickets")}
+              </Link>
+              <Link
+                to={lp("/upgrade")}
+                data-testid="upgrade-to-vip-button"
+                className="inline-block whitespace-nowrap border border-[#C9A227] text-[#E7C55A] hover:bg-[#C9A227]/10 active:scale-95 font-display font-bold uppercase text-xs sm:text-base tracking-[0.12em] sm:tracking-[0.15em] px-8 sm:px-10 py-4 rounded-full transition-all duration-300 min-h-[54px]"
+              >
+                {t("hero.upgrade")}
+              </Link>
+            </div>
           ) : (
             <p className="mt-7 font-display font-bold uppercase text-sm tracking-[0.2em] text-slate-500" data-testid="hero-soldout-all">
               {t("hero.soldOut")}

@@ -11,6 +11,7 @@ import FaqPage from "@/pages/FaqPage";
 import GalleryPage from "@/pages/GalleryPage";
 import ReservePage from "@/pages/ReservePage";
 import PrivacyPage from "@/pages/PrivacyPage";
+import UpgradePage from "@/pages/UpgradePage";
 import Admin from "@/pages/Admin";
 import Scanner from "@/pages/Scanner";
 import CookieBanner from "@/components/CookieBanner";
@@ -76,6 +77,7 @@ const PUBLIC_ROUTES = [
   ["/faq", <FaqPage />],
   ["/gallery", <GalleryPage />],
   ["/reserve", <ReservePage />],
+  ["/upgrade", <UpgradePage />],
   ["/privacy", <PrivacyPage />],
 ];
 

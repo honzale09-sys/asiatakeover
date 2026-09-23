@@ -91,6 +91,11 @@ export default function Success() {
                 .replace("{qty}", status.quantity)
                 .replace("{amount}", czk(status.amount_czk))}
             </p>
+            {status.tier_name === "VIP Upgrade" && (
+              <p className="font-mono2 text-xs text-[#E7C55A] text-center mb-6 -mt-3" data-testid="success-upgrade-note">
+                {t("success.upgradeNote")}
+              </p>
+            )}
             <div className="grid sm:grid-cols-2 gap-4">
               {(tickets || []).map((t) => (
                 <div key={t.code} data-testid={`success-ticket-${t.code}`} className="border border-white/10 rounded-xl p-4 bg-[#0D0E15] flex gap-4 items-center">

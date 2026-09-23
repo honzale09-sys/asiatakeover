@@ -84,9 +84,9 @@ def test_gold_promo_rejected():
 def test_gold_tier_sold_counts_tables(admin):
     r = admin.get(f"{BASE_URL}/api/site", timeout=15)
     gold = next(t for t in r.json()["tiers"] if "GOLD" in t["name"].upper())
-    # no paid gold orders in preview -> 0 tables sold, capacity 2
+    # no paid gold orders in preview -> 0 tables sold, capacity 3 (raised 2→3 by owner)
     assert gold["sold"] == 0
-    assert gold["capacity"] == 2
+    assert gold["capacity"] == 3
 
 
 # ---------- RESERVATIONS ----------

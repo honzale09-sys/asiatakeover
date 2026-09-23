@@ -746,16 +746,25 @@ function MessagesTab() {
   const [search, setSearch] = useState("");
   const [statusF, setStatusF] = useState("all");
   const [editStatus, setEditStatus] = useState({});
+  const [editNotes, setEditNotes] = useState({});
+  const [editFloor, setEditFloor] = useState({});
   const [confirmRemove, setConfirmRemove] = useState(null);
 
   const load = () => api.get("/admin/messages").then((r) => setMessages(r.data)).catch((e) => toast.error(formatError(e)));
   useEffect(() => { load(); }, []);
 
-  const saveStatus = async (id) => {
+  const saveMessage = async (id) => {
+    const payload = {};
+    if (editStatus[id] !== undefined) payload.status = editStatus[id];
+    if (editNotes[id] !== undefined) payload.notes = editNotes[id];
+    if (editFloor[id] !== undefined) payload.floor = editFloor[id];
+    if (!Object.keys(payload).length) return;
     try {
-      await api.put(`/admin/messages/${id}`, { status: editStatus[id] });
-      toast.success("Status saved");
+      await api.put(`/admin/messages/${id}`, payload);
+      toast.success("Saved");
       setEditStatus((s) => { const n = { ...s }; delete n[id]; return n; });
+      setEditNotes((s) => { const n = { ...s }; delete n[id]; return n; });
+      setEditFloor((s) => { const n = { ...s }; delete n[id]; return n; });
       load();
     } catch (e) { toast.error(formatError(e)); }
   };
@@ -877,6 +886,16 @@ function MessagesTab() {
               </p>
             )}
             <p className="text-sm text-slate-300 leading-relaxed">{m.message}</p>
+            {!m.removed && (
+              <textarea
+                rows={2}
+                className={`${inputCls} mt-3 text-xs`}
+                placeholder="Internal note… (visible to all admins)"
+                value={editNotes[m.id] ?? m.notes ?? ""}
+                onChange={(e) => setEditNotes((s) => ({ ...s, [m.id]: e.target.value }))}
+                data-testid={`message-notes-${short}`}
+              />
+            )}
             <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-2">
               {m.removed ? (
                 <button onClick={() => restore(m.id)} className={actBtn} data-testid={`message-restore-${short}`}>Restore</button>
@@ -890,8 +909,21 @@ function MessagesTab() {
                   >
                     {MSG_STATUSES.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
                   </select>
-                  {pending && pending !== st && (
-                    <button onClick={() => saveStatus(m.id)} className={`${actBtn} border-[#00F0FF] text-[#00F0FF]`} data-testid={`message-status-save-${short}`}>Save</button>
+                  {("guests" in m || "floor" in m) && (
+                    <select
+                      className={`${inputCls} !w-auto !py-1.5 text-xs`}
+                      value={editFloor[m.id] ?? m.floor ?? ""}
+                      onChange={(e) => setEditFloor((s) => ({ ...s, [m.id]: e.target.value }))}
+                      data-testid={`message-floor-select-${short}`}
+                    >
+                      <option value="">No floor assigned</option>
+                      <option value="Seoul Floor (7th)">Seoul Floor (7th)</option>
+                      <option value="Saigon Floor (5th)">Saigon Floor (5th)</option>
+                      <option value="Mainstream Floor (6th)">Mainstream Floor (6th)</option>
+                    </select>
+                  )}
+                  {((pending && pending !== st) || editNotes[m.id] !== undefined || editFloor[m.id] !== undefined) && (
+                    <button onClick={() => saveMessage(m.id)} className={`${actBtn} border-[#00F0FF] text-[#00F0FF]`} data-testid={`message-status-save-${short}`}>Save</button>
                   )}
                   {confirmRemove === m.id ? (
                     <>

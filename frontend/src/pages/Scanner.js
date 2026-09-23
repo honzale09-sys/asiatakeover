@@ -54,13 +54,18 @@ export default function Scanner() {
     []
   );
 
-  // Transparently refresh the session once on 401 so door staff never get logged out mid-scan.
+  // Transparently refresh the session once on 401 so door staff never get logged out mid-scan,
+  // and retry once on transient failures (edge 429 / 5xx / network hiccup) before showing an error.
   const withRefresh = useCallback(async (fn) => {
     try {
       return await fn();
     } catch (e) {
       if (e?.response?.status === 401) {
         await api.post("/auth/refresh");
+        return await fn();
+      }
+      if (!e?.response || e.response.status === 429 || e.response.status >= 500) {
+        await new Promise((r) => setTimeout(r, 1200));
         return await fn();
       }
       throw e;
