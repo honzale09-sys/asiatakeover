@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend testing for the UPGRADE-to-VIP + Admin Messages (notes/floor/status unified save) + Gold/promo regression batch. All primary flows PASS. Hero shows UPGRADE TO VIP button on desktop AND mobile (390px); i18n paths (/vi/upgrade, /zh/upgrade) render correctly; upgrade error paths (unknown code -> 'Ticket not found', already checked-in -> 'This ticket was already checked in') surface via toast; happy path (ATF-63BBC9, 1ST RELEASE) advances verify->pay->Teya embedded checkout container mounts (stopped before entering card data). Admin Messages: notes textarea + floor select + status select saved together via single Save button; all three persist after full page reload; floor filter (mainstream/seoul) filters correctly; Remove + Restore regression works. Tickets regression: promo MZYPL5BKOD applies '−95% (list price 499 Kč)', gold card copy '3999 Kč table fee', '899 Kč per person', 'Only 3 tables available' all present.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "not_tested": [
+    "already-VIP error path on /api/upgrade/check: no VIP tickets exist in preview DB (only Early Bird + 1ST RELEASE tiers on paid orders), so 'already VIP' toast could not be exercised. Recommend a backend unit test / seed VIP ticket to fully cover.",
+    "Gold fulfilment auto-creating 'VIP GOLD TABLE' entry in admin Messages: 0 messages with topic 'VIP GOLD TABLE' currently exist and no gold order can be paid in preview (real Teya). Only topics present today: 'VIP Table Reservation', 'VIP Table Booking'. Main agent already verified in in-process fulfilment tests; not re-verifiable via UI in preview without simulated fulfilment.",
+    "Scanner client retry (401/429/5xx auto-retry) — excluded per request (camera not available in headless)."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "Optional: expose an admin/test helper to force-fulfil a mocked GOLD order in preview so the VIP GOLD TABLE auto-message can be QA'd end-to-end (front + back).",
+    "Optional: seed one VIP ticket in preview so the 'already VIP' upgrade error path is UI-verifiable."
+  ],
+  "critical_code_review_comments": [
+    "UpgradePage.js: uses window.location.assign to navigate to /success and /payment_url; consistent with checkout pattern but bypasses React Router history — acceptable but noted.",
+    "Admin.js MessagesTab line ~925: Save button only shows if pending status differs, notes touched, or floor touched — user could clear all three and see nothing to save. Minor UX; not a bug.",
+    "server.py /admin/messages/{id} correctly gates status/notes/floor with 'if not upd: 400 Nothing to update'; validation for floor uses MESSAGE_FLOORS set — good.",
+    "GET /admin/messages returns 'notes' only for docs that have the field written (Mongo behaviour). Frontend reads m.notes ?? '' so this is safe."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (frontend-only iteration)", "frontend": "100% of testable items pass" },
+  "test_credentials": "admin@asiatakeover.eu / Takeover2026! (from /app/memory/test_credentials.md). Standard ticket used for upgrade happy path: ATF-63BBC9 (1ST RELEASE). Used-ticket sample for error path: ATF-ECA5EF (Early Bird, checked_in_at populated).",
+  "seed_data_creation": "Left one admin message (id short 603c157f) with status=contacted, floor=Mainstream Floor (6th), notes='TEST note 603c15-...' after the persistence test then remove+restore round-trip. Main agent may want to revert if needed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Preview DB has 36 messages, 0 with topic containing 'VIP GOLD TABLE' — GOLD auto-message on fulfilment is only verifiable via backend/in-process test or by seeding a paid gold order. No VIP-tier tickets currently exist, so /api/upgrade/check 'already VIP' branch is only reachable after someone upgrades or via seed. Upgrade endpoint URLs verified: POST /api/upgrade/check (200/400/404), POST /api/upgrade/create (Teya session). Language routing /vi/upgrade, /zh/upgrade, /upgrade all render with correct i18n content.",
+  "rca of the issue": "n/a — no bugs detected in this batch."
+}

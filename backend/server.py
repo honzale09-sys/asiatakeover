@@ -1953,7 +1953,7 @@ async def admin_messages(admin=Depends(get_current_admin)):
 
 
 MESSAGE_STATUSES = {"new", "contacted", "confirmed", "declined"}
-MESSAGE_FLOORS = {"Seoul Floor (7th)", "Saigon Floor (5th)", "Mainstream Floor (6th)"}
+MESSAGE_FLOORS = {"Seoul Floor (7th)", "Saigon Floor (5th)"}
 
 
 class MessageUpdateIn(BaseModel):

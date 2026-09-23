@@ -919,7 +919,9 @@ function MessagesTab() {
                       <option value="">No floor assigned</option>
                       <option value="Seoul Floor (7th)">Seoul Floor (7th)</option>
                       <option value="Saigon Floor (5th)">Saigon Floor (5th)</option>
-                      <option value="Mainstream Floor (6th)">Mainstream Floor (6th)</option>
+                      {m.floor && !["Seoul Floor (7th)", "Saigon Floor (5th)"].includes(m.floor) && (
+                        <option value={m.floor} disabled>{m.floor} (legacy)</option>
+                      )}
                     </select>
                   )}
                   {((pending && pending !== st) || editNotes[m.id] !== undefined || editFloor[m.id] !== undefined) && (
