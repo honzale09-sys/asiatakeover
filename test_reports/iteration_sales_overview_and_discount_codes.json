@@ -1,0 +1,33 @@
+{
+  "summary": "Tested new SALES OVERVIEW card + Discount Codes admin tab (backend + frontend). 14/14 pytest tests passed. UI flows verified: admin login, Sales Overview time/ticket/metric filters, revenue equality with stat-revenue (9 629 Kč), VIP empty state, discount CRUD (create / edit / toggle / delete), duplicate code 409 toast, mobile 390px layout.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sales Overview chart", "issues": ["Recharts logs 'width(-1) and height(-1)' warning during tab-switch/viewport-resize before ResponsiveContainer has laid out (chart still renders correctly). Purely a console noise, not user-visible."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_sales_overview_and_promo.py",
+    "/app/test_reports/pytest/sales_overview_promo.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SalesOverview.js does all filtering client-side from a single /admin/sales-overview fetch on mount — this is fine now but if paid orders scale into the tens of thousands the response (~capped at 100000) could get heavy. Consider a server-side aggregation endpoint later.",
+    "OverviewTab Category Card shows Standard SOLD=1 while stat-tickets-sold=22 and Sales Overview Standard=21 in preview DB — this is EXISTING behaviour outside this task's scope, but worth confirming with the main agent that categories.standard.sold semantics are intentional (e.g. excluding upgrades and comps in a different way). Not a regression from this iteration."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_sales_overview_and_promo.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@asiatakeover.eu / Takeover2026! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None persisted. Test discount codes created during pytest/UI runs are cleaned up (delete endpoint) in teardown / UI flow.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Preview DB has only paid Standard orders (21 tickets, 9 629 Kč, no VIP paid) so VIP filter legitimately shows so-empty. Do NOT delete existing promo codes MZYPL5BKOD or ATFTEST95. If /api/orders/create returns 429, restart backend to clear the in-memory rate limit.",
+  "rca of the issue": "N/A — no bugs found. Verified: (a) /admin/sales-overview revenue exactly matches /admin/stats revenue_czk (9629); (b) TOTAL SOLD = STANDARD + VIP; (c) VIP filter renders so-empty; (d) full promo CRUD works incl. 409 conflict, blank-code auto-generation, percent 1-100 validation, edit, deactivate, delete; (e) promo/validate returns amount_off_czk / percent_off / uses_left / valid=false for inactive."
+}
