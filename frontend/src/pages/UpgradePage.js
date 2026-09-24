@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { api, czk, formatError } from "@/api";
+import { api, formatError } from "@/api";
 import { LangPicker } from "@/components/site/Navbar";
+import { useTeyaCheckout, TEYA_CONTAINER_ID } from "@/components/site/checkout/useTeyaCheckout";
 import { useT } from "@/i18n";
 
 const inputCls =
@@ -19,30 +20,7 @@ export default function UpgradePage() {
   const [step, setStep] = useState("verify"); // verify | pay | processing | payment
   const [payment, setPayment] = useState(null);
 
-  useEffect(() => {
-    if (step !== "payment" || !payment) return;
-    let el = null;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { initTeyaBlocks } = await import("@teyaproduct/teya-blocks-js");
-        const teya = await initTeyaBlocks(payment.sessionToken, { locale: "cs-CZ" });
-        if (cancelled) return;
-        if (!teya) throw new Error("sdk init failed");
-        el = teya.elements.createCheckout({
-          onSuccess: () => window.location.assign(`/success?order_id=${payment.orderId}`),
-          onError: () => toast.error("Payment failed — please try again."),
-        });
-        el.mount("#teya-checkout-container");
-      } catch {
-        if (!cancelled) toast.error("Payment form failed to load — please refresh and try again.");
-      }
-    })();
-    return () => {
-      cancelled = true;
-      try { el && el.unmount(); } catch (e) { console.warn("Upgrade: Teya unmount failed", e); }
-    };
-  }, [step, payment]);
+  useTeyaCheckout(payment, step === "payment", "Upgrade");
 
   const verify = async (e) => {
     e.preventDefault();
@@ -147,7 +125,7 @@ export default function UpgradePage() {
 
           {step === "payment" && payment && (
             <div data-testid="upgrade-teya-checkout">
-              <div id="teya-checkout-container" data-testid="teya-checkout-container" className="bg-white rounded-xl overflow-hidden min-h-[320px]" />
+              <div id={TEYA_CONTAINER_ID} data-testid="teya-checkout-container" className="bg-white rounded-xl overflow-hidden min-h-[320px]" />
             </div>
           )}
         </div>

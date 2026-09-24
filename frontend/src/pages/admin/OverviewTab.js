@@ -1,0 +1,89 @@
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { api, formatError, czk } from "@/api";
+import { StatCard, cardCls } from "./shared";
+import { VipGuestListCard } from "./VipGuestListCard";
+
+function CategoryCard({ label, color, data, testid }) {
+  return (
+    <div className={cardCls} data-testid={testid}>
+      <p className={`font-mono2 text-[11px] uppercase tracking-[0.25em] mb-2 ${color}`}>{label}</p>
+      <p className="font-display font-black text-xl sm:text-2xl whitespace-nowrap">
+        {data?.sold ?? 0} <span className="text-xs text-slate-500 font-bold">SOLD</span>
+        <span className="text-slate-600 mx-1.5">/</span>
+        <span className="text-green-400">{data?.checked_in ?? 0}</span> <span className="text-xs text-slate-500 font-bold">CHECKED IN</span>
+      </p>
+    </div>
+  );
+}
+
+function RevenueCheckCard({ stats }) {
+  const rc = stats.revenue_check;
+  const rows = [
+    ["Sold × tier price (list)", czk(rc.list_total_czk + rc.comp_nominal_czk), "rc-list", "font-mono2"],
+    [`Comp tickets (${rc.comp_tickets} pcs, free)`, `−${czk(rc.comp_nominal_czk)}`, "rc-comps", "font-mono2 text-[#FFE600]"],
+    ["Promo discounts", `−${czk(rc.promo_discount_czk)}`, "rc-promo", "font-mono2 text-[#FFE600]"],
+  ];
+  return (
+    <div className={cardCls} data-testid="revenue-check-card">
+      <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-slate-400 mb-6">Revenue check (Teya reconciliation)</p>
+      <div className="space-y-3 text-sm max-w-md">
+        {rows.map(([label, value, tid, cls]) => (
+          <div key={tid} className="flex justify-between gap-4">
+            <span className="text-slate-400">{label}</span>
+            <span className={cls} data-testid={tid}>{value}</span>
+          </div>
+        ))}
+        <div className="flex justify-between gap-4 pt-3 border-t border-white/10">
+          <span className="text-white font-bold uppercase text-xs tracking-wider">= Actually paid (matches Teya)</span>
+          <span className="font-mono2 font-bold text-green-400" data-testid="rc-paid">{czk(stats.revenue_czk)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SalesChart({ data }) {
+  return (
+    <div className={cardCls}>
+      <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-slate-400 mb-6">Sales per tier</p>
+      <div className="h-64" data-testid="sales-chart">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data}>
+            <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+            <XAxis dataKey="name" tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={{ background: "#0D0E15", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12 }} labelStyle={{ color: "#00F0FF" }} />
+            <Bar dataKey="sold" name="Sold" fill="#FF0055" radius={[6, 6, 0, 0]} />
+            <Bar dataKey="capacity" name="Capacity" fill="#262739" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+export function OverviewTab() {
+  const [stats, setStats] = useState(null);
+  const load = useCallback(() => api.get("/admin/stats").then((r) => setStats(r.data)).catch((e) => toast.error(formatError(e))), []);
+  useEffect(() => { load(); }, [load]);
+  if (!stats) return <p className="font-mono2 text-sm text-slate-500">Loading stats…</p>;
+  return (
+    <div className="space-y-8" data-testid="admin-overview">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Revenue" value={czk(stats.revenue_czk)} testid="stat-revenue" />
+        <StatCard label="Tickets Sold" value={stats.tickets_sold} testid="stat-tickets-sold" />
+        <StatCard label="Checked In" value={stats.checked_in} testid="stat-checked-in" />
+        <StatCard label="Orders" value={stats.orders} testid="stat-orders" />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3" data-testid="category-cards">
+        <CategoryCard label="Standard" color="text-[#00F0FF]" data={stats.categories?.standard} testid="cat-standard" />
+        <CategoryCard label="VIP" color="text-[#C9A227]" data={stats.categories?.vip} testid="cat-vip" />
+        <VipGuestListCard stats={stats} onSent={load} />
+      </div>
+      {stats.revenue_check && <RevenueCheckCard stats={stats} />}
+      <SalesChart data={stats.per_tier} />
+    </div>
+  );
+}

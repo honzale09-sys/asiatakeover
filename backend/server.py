@@ -9,6 +9,7 @@ import asyncio
 import hashlib
 import io
 import ipaddress
+import json
 import logging
 import os
 import re
@@ -460,32 +461,26 @@ def sha256_norm(value: str) -> str:
     return hashlib.sha256(re.sub(r"\s+", "", value.strip().lower()).encode()).hexdigest()
 
 
-async def send_capi_purchase(order: dict):
-    event_id = f"purchase_{order['id']}"
-    if not META_CAPI_TOKEN or not META_PIXEL_ID:
-        logger.info("Meta CAPI not configured — skipping server Purchase %s", event_id)
-        return
-    if await db.meta_events.find_one({"event_id": event_id}):
-        return
+def _capi_user_data(order: dict) -> dict:
+    if not order.get("marketing_consent"):
+        return {}
     attr = order.get("attribution") or {}
-    user_data = {}
-    if order.get("marketing_consent"):
-        user_data["em"] = [sha256_norm(order["buyer_email"])]
-        if order.get("client_ip"):
-            user_data["client_ip_address"] = order["client_ip"]
-        if order.get("user_agent"):
-            user_data["client_user_agent"] = order["user_agent"]
-        if attr.get("fbp"):
-            user_data["fbp"] = attr["fbp"]
-        if attr.get("fbc"):
-            user_data["fbc"] = attr["fbc"]
-    event = {
+    user_data = {"em": [sha256_norm(order["buyer_email"])]}
+    optional = (("client_ip_address", order.get("client_ip")), ("client_user_agent", order.get("user_agent")),
+                ("fbp", attr.get("fbp")), ("fbc", attr.get("fbc")))
+    user_data.update({k: v for k, v in optional if v})
+    return user_data
+
+
+def _capi_event(order: dict, event_id: str) -> dict:
+    attr = order.get("attribution") or {}
+    return {
         "event_name": "Purchase",
         "event_time": int(time.time()),
         "event_id": event_id,
         "action_source": "website",
         "event_source_url": attr.get("event_source_url") or SITE_URL,
-        "user_data": user_data,
+        "user_data": _capi_user_data(order),
         "custom_data": {
             "value": order["amount_czk"],
             "currency": "CZK",
@@ -496,7 +491,16 @@ async def send_capi_purchase(order: dict):
             "order_id": order["id"],
         },
     }
-    body = {"data": [event]}
+
+
+async def send_capi_purchase(order: dict):
+    event_id = f"purchase_{order['id']}"
+    if not META_CAPI_TOKEN or not META_PIXEL_ID:
+        logger.info("Meta CAPI not configured — skipping server Purchase %s", event_id)
+        return
+    if await db.meta_events.find_one({"event_id": event_id}):
+        return
+    body = {"data": [_capi_event(order, event_id)]}
     if META_TEST_EVENT_CODE:
         body["test_event_code"] = META_TEST_EVENT_CODE
     url = f"https://graph.facebook.com/{META_API_VERSION}/{META_PIXEL_ID}/events"
@@ -567,31 +571,47 @@ class _EmailScan(HTMLParser):
             self._href, self._text = None, []
 
 
-def _assert_safe_email(subject: str, html: str) -> None:
-    scan = _EmailScan()
-    scan.feed(html)
+def _check_no_forms(scan: "_EmailScan") -> None:
     if scan.tags & {"form", "input", "textarea", "select"}:
         raise ValueError("No forms or input fields in email")
+
+
+def _check_no_credential_asks(subject: str, html: str) -> None:
     body = f"{subject}\n{html}".lower()
     for p in _CRED_ASK:
         if p in body:
             raise ValueError(f"Email asks recipient for credentials: {p!r}")
-    for url in scan.urls:
+
+
+def _check_url_safety(urls: list) -> None:
+    for url in urls:
         low = url.strip().lower()
         if low.startswith(("mailto:", "tel:", "cid:", "#")):
             continue
         if not low.startswith("https://"):
             raise ValueError(f"Email links/assets must be absolute https: {url!r}")
-        host = urlparse(low).hostname or ""
-        if not _host_ok(host) or urlparse(low).username is not None:
+        parsed = urlparse(low)
+        if not _host_ok(parsed.hostname or "") or parsed.username is not None:
             raise ValueError(f"Shortened, numeric-host or credential-bearing URL: {url!r}")
-    for href, text in scan.anchors:
+
+
+def _check_anchor_text(anchors: list) -> None:
+    for href, text in anchors:
         real = urlparse(href.strip().lower()).hostname or ""
         if not real:
             continue
         for m in _HOSTISH.finditer(text):
             if not _same_site(m.group(1).lower(), real):
                 raise ValueError(f"Anchor text {m.group(1)!r} != real link host {real!r}")
+
+
+def _assert_safe_email(subject: str, html: str) -> None:
+    scan = _EmailScan()
+    scan.feed(html)
+    _check_no_forms(scan)
+    _check_no_credential_asks(subject, html)
+    _check_url_safety(scan.urls)
+    _check_anchor_text(scan.anchors)
 
 
 async def email_rate_gate():
@@ -1160,131 +1180,121 @@ async def promo_validate(code: str):
     return {"valid": False}
 
 
-@api_router.post("/orders/create")
-async def create_order(data: OrderCreateIn, request: Request):
-    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() or (
-        request.client.host if request.client else "unknown")
-    rate_limit(ip)
+def client_ip(request: Request) -> str:
+    fwd = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    return fwd or (request.client.host if request.client else "unknown")
+
+
+async def active_event() -> dict:
     event = await db.events.find_one({"active": True}, {"_id": 0})
     if not event:
         raise HTTPException(404, "No active event")
-    tier = await db.ticket_tiers.find_one({"id": data.tier_id}, {"_id": 0})
-    if not tier or tier["event_id"] != event["id"]:
-        raise HTTPException(404, "Ticket tier not found")
-    is_group = "GROUP" in tier["name"].upper()
-    is_gold = "GOLD" in tier["name"].upper()
-    tickets_per_unit = 4 if is_group else 1
-    if "VIP" not in tier["name"].upper() and not is_group:
-        ga_tiers = await db.ticket_tiers.find({"event_id": event["id"]}).to_list(100)
-        ga_tiers = [t for t in ga_tiers if "VIP" not in t["name"].upper() and "GROUP" not in t["name"].upper()]
-        ga_tiers.sort(key=lambda t: t["price_czk"])
-        active_id = None
-        for t in ga_tiers:
-            if await db.tickets.count_documents({"tier_id": t["id"]}) < t["capacity"]:
-                active_id = t["id"]
-                break
-        if active_id is None:
-            raise HTTPException(400, "All releases are sold out")
-        if tier["id"] != active_id:
-            raise HTTPException(400, "This release is not on sale yet")
+    return event
+
+
+async def assert_ga_release_on_sale(event_id: str, tier: dict) -> None:
+    """Sequential GA releases: only the first release with free capacity is purchasable."""
+    tiers = await db.ticket_tiers.find({"event_id": event_id}).to_list(100)
+    ga = sorted((t for t in tiers if "VIP" not in t["name"].upper() and "GROUP" not in t["name"].upper()),
+                key=lambda t: t["price_czk"])
+    for t in ga:
+        if await db.tickets.count_documents({"tier_id": t["id"]}) < t["capacity"]:
+            if tier["id"] != t["id"]:
+                raise HTTPException(400, "This release is not on sale yet")
+            return
+    raise HTTPException(400, "All releases are sold out")
+
+
+async def assert_tier_capacity(tier: dict, quantity: int, tickets_per_unit: int, is_gold: bool) -> None:
     if is_gold:
-        if not (4 <= data.quantity <= 14):
+        if not (4 <= quantity <= 14):
             raise HTTPException(400, "Gold table requires 4–14 guests")
         tables_sold = await db.orders.count_documents({"tier_id": tier["id"], "payment_status": "paid"})
         if tables_sold >= tier["capacity"]:
             raise HTTPException(400, "Sold out")
-    else:
-        sold = await db.tickets.count_documents({"tier_id": tier["id"]})
-        if sold + data.quantity * tickets_per_unit > tier["capacity"]:
-            raise HTTPException(400, "Not enough tickets left in this tier")
-    unit_price = tier["price_czk"]
-    discount_percent = None
-    promo_code_used = None
-    if data.promo_code:
-        if is_gold:
-            raise HTTPException(400, "Discount codes cannot be used for the Gold Table")
-        c = data.promo_code.strip().upper()
-        promo = await db.promo_codes.find_one({"code": c, "active": True})
-        if promo:
-            discount_percent = promo["percent_off"]
-            unit_price = max(1, round(unit_price * (100 - discount_percent) / 100))
-            promo_code_used = c
-        else:
-            amb = await db.ambassadors.find_one({"code": c, "active": True})
-            if amb:
-                if is_group or is_gold:
-                    raise HTTPException(400, "This code is valid for Standard and VIP Table tickets only")
-                sales = await ambassador_sales(c)
-                left = AMB_MAX_USES - sales
-                if left <= 0:
-                    raise HTTPException(400, "This code has no discounted tickets left")
-                if data.quantity > left:
-                    raise HTTPException(400, f"This code has only {left} discounted ticket(s) left")
-                unit_price = max(1, unit_price - amb.get("discount_czk", AMB_DISCOUNT_CZK))
-                promo_code_used = c
-            else:
-                amb2 = await db.ambassadors.find_one({"fifty.code": c, "active": True})
-                if amb2 and not amb2["fifty"].get("redeemed"):
-                    if is_group or is_gold:
-                        raise HTTPException(400, "This code is valid for Standard and VIP Table tickets only")
-                    if data.quantity > 1:
-                        raise HTTPException(400, "This code is valid for one ticket only")
-                    discount_percent = 50
-                    unit_price = max(1, round(unit_price / 2))
-                    promo_code_used = c
-                else:
-                    raise HTTPException(400, "Invalid discount code")
-    if is_gold:
-        amount = 3999 + 899 * data.quantity
-        unit_price = round(amount / data.quantity)
-    else:
-        amount = unit_price * data.quantity
-    order = {
+        return
+    sold = await db.tickets.count_documents({"tier_id": tier["id"]})
+    if sold + quantity * tickets_per_unit > tier["capacity"]:
+        raise HTTPException(400, "Not enough tickets left in this tier")
+
+
+async def apply_discount_code(code: str, unit_price: int, quantity: int, restricted: bool):
+    """Resolve promo / ambassador / ambassador-50% codes. Returns (unit_price, discount_percent, code_used).
+    `restricted` = GROUP/GOLD tiers where ambassador codes are not accepted."""
+    c = code.strip().upper()
+    promo = await db.promo_codes.find_one({"code": c, "active": True})
+    if promo:
+        pct = promo["percent_off"]
+        return max(1, round(unit_price * (100 - pct) / 100)), pct, c
+    amb = await db.ambassadors.find_one({"code": c, "active": True})
+    if amb:
+        if restricted:
+            raise HTTPException(400, "This code is valid for Standard and VIP Table tickets only")
+        left = AMB_MAX_USES - await ambassador_sales(c)
+        if left <= 0:
+            raise HTTPException(400, "This code has no discounted tickets left")
+        if quantity > left:
+            raise HTTPException(400, f"This code has only {left} discounted ticket(s) left")
+        return max(1, unit_price - amb.get("discount_czk", AMB_DISCOUNT_CZK)), None, c
+    amb2 = await db.ambassadors.find_one({"fifty.code": c, "active": True})
+    if amb2 and not amb2["fifty"].get("redeemed"):
+        if restricted:
+            raise HTTPException(400, "This code is valid for Standard and VIP Table tickets only")
+        if quantity > 1:
+            raise HTTPException(400, "This code is valid for one ticket only")
+        return max(1, round(unit_price / 2)), 50, c
+    raise HTTPException(400, "Invalid discount code")
+
+
+def new_order_doc(*, event: dict, tier_id: str, tier_name: str, quantity: int, tickets_per_unit: int,
+                  amount: int, list_price: int, unit_price: int, buyer_name: str, buyer_email: str,
+                  buyer_phone: str, request: Request, **extra) -> dict:
+    now = utcnow().isoformat()
+    return {
         "id": new_id(),
-        "created_at": utcnow().isoformat(),
-        "updated_at": utcnow().isoformat(),
+        "created_at": now,
+        "updated_at": now,
         "event_id": event["id"],
         "event_name": event["name"],
-        "tier_id": tier["id"],
-        "tier_name": ticket_display_name(tier["name"]),
-        "quantity": data.quantity,
+        "tier_id": tier_id,
+        "tier_name": tier_name,
+        "quantity": quantity,
         "tickets_per_unit": tickets_per_unit,
         "amount_czk": amount,
-        "list_price_czk": 0 if is_gold else tier["price_czk"],
+        "list_price_czk": list_price,
         "unit_price_czk": unit_price,
-        "promo_code": promo_code_used,
-        "discount_percent": discount_percent,
+        "promo_code": None,
+        "discount_percent": None,
         "currency": "CZK",
-        "buyer_name": data.name,
-        "buyer_email": data.email.lower(),
-        "buyer_phone": data.phone.strip(),
+        "buyer_name": buyer_name,
+        "buyer_email": buyer_email.lower(),
+        "buyer_phone": buyer_phone.strip(),
         "payment_status": "created",
         "gopay_payment_id": None,
         "paid_at": None,
         "fulfillment_status": "pending",
-        "marketing_consent": data.marketing_consent,
-        "attribution": data.attribution.model_dump() if data.attribution else None,
-        "client_ip": ip,
+        "marketing_consent": False,
+        "attribution": None,
+        "client_ip": client_ip(request),
         "user_agent": request.headers.get("user-agent"),
+        **extra,
     }
-    payment_url = mode = None
+
+
+async def create_payment_and_store(order: dict) -> dict:
+    """Opens the provider payment (Teya → GoPay → guarded simulation), persists the order, returns the checkout response."""
     if teya_configured():
         s = await teya_create_session(order)
-        order["teya_session_id"] = str(s["session_id"])
-        order["payment_provider"] = "teya"
-        payment_url = s["session_url"]
-        mode = "teya"
-        order["teya_session_token"] = s["session_token"]
+        order.update(teya_session_id=str(s["session_id"]), payment_provider="teya", teya_session_token=s["session_token"])
+        payment_url, mode = s["session_url"], "teya"
     elif gopay_configured():
         p = await gopay_create_payment(order)
         order["gopay_payment_id"] = str(p["id"])
-        payment_url = p["gw_url"]
-        mode = "gopay"
+        payment_url, mode = p["gw_url"], "gopay"
     elif payment_sim_allowed():
         pid = f"SIM-{order['id']}"
         order["gopay_payment_id"] = pid
-        payment_url = f"/pay/{order['id']}"
-        mode = "simulation"
+        payment_url, mode = f"/pay/{order['id']}", "simulation"
         await db.sim_payments.insert_one({"id": pid, "state": "CREATED", "order_id": order["id"]})
     else:
         raise HTTPException(503, "Online payments are temporarily unavailable")
@@ -1297,6 +1307,42 @@ async def create_order(data: OrderCreateIn, request: Request):
         "currency": "CZK",
         "session_token": order.get("teya_session_token"),
     }
+
+
+@api_router.post("/orders/create")
+async def create_order(data: OrderCreateIn, request: Request):
+    rate_limit(client_ip(request))
+    event = await active_event()
+    tier = await db.ticket_tiers.find_one({"id": data.tier_id}, {"_id": 0})
+    if not tier or tier["event_id"] != event["id"]:
+        raise HTTPException(404, "Ticket tier not found")
+    upper = tier["name"].upper()
+    is_group, is_gold = "GROUP" in upper, "GOLD" in upper
+    tickets_per_unit = 4 if is_group else 1
+    if "VIP" not in upper and not is_group:
+        await assert_ga_release_on_sale(event["id"], tier)
+    await assert_tier_capacity(tier, data.quantity, tickets_per_unit, is_gold)
+    unit_price, discount_percent, promo_code_used = tier["price_czk"], None, None
+    if data.promo_code:
+        if is_gold:
+            raise HTTPException(400, "Discount codes cannot be used for the Gold Table")
+        unit_price, discount_percent, promo_code_used = await apply_discount_code(
+            data.promo_code, unit_price, data.quantity, restricted=is_group or is_gold)
+    if is_gold:
+        amount = 3999 + 899 * data.quantity
+        unit_price = round(amount / data.quantity)
+    else:
+        amount = unit_price * data.quantity
+    order = new_order_doc(
+        event=event, tier_id=tier["id"], tier_name=ticket_display_name(tier["name"]),
+        quantity=data.quantity, tickets_per_unit=tickets_per_unit, amount=amount,
+        list_price=0 if is_gold else tier["price_czk"], unit_price=unit_price,
+        buyer_name=data.name, buyer_email=data.email, buyer_phone=data.phone, request=request,
+        promo_code=promo_code_used, discount_percent=discount_percent,
+        marketing_consent=data.marketing_consent,
+        attribution=data.attribution.model_dump() if data.attribution else None,
+    )
+    return await create_payment_and_store(order)
 
 
 # ---------------- ticket upgrade (Standard → VIP) ----------------
@@ -1350,71 +1396,19 @@ async def current_vip_tier(event_id: str) -> dict:
 
 @api_router.post("/upgrade/create")
 async def upgrade_create(data: UpgradeCreateIn, request: Request):
-    ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-          or (request.client.host if request.client else "unknown"))
-    rate_limit(ip)
+    rate_limit(client_ip(request))
     t = await upgradeable_ticket(data.code)
-    event = await db.events.find_one({"active": True}, {"_id": 0})
-    if not event:
-        raise HTTPException(404, "No active event")
+    event = await active_event()
     vip_tier = await current_vip_tier(event["id"])
-    order = {
-        "id": new_id(),
-        "created_at": utcnow().isoformat(),
-        "updated_at": utcnow().isoformat(),
-        "kind": "upgrade",
-        "event_id": event["id"],
-        "event_name": event["name"],
-        "tier_id": vip_tier["id"],
-        "tier_name": "VIP Upgrade",
-        "quantity": 1,
-        "tickets_per_unit": 1,
-        "amount_czk": UPGRADE_PRICE_CZK,
-        "list_price_czk": UPGRADE_PRICE_CZK,
-        "unit_price_czk": UPGRADE_PRICE_CZK,
-        "promo_code": None,
-        "discount_percent": None,
-        "currency": "CZK",
-        "buyer_name": data.name.strip(),
-        "buyer_email": data.email.lower(),
-        "buyer_phone": data.phone.strip(),
-        "upgrade_ticket_code": t["code"],
-        "upgrade_vip_tier_id": vip_tier["id"],
-        "payment_status": "created",
-        "gopay_payment_id": None,
-        "paid_at": None,
-        "fulfillment_status": "pending",
-        "marketing_consent": False,
-        "attribution": None,
-        "client_ip": ip,
-        "user_agent": request.headers.get("user-agent"),
-    }
-    payment_url = mode = None
-    if teya_configured():
-        s = await teya_create_session(order)
-        order["teya_session_id"] = str(s["session_id"])
-        order["payment_provider"] = "teya"
-        payment_url = s["session_url"]
-        mode = "teya"
-        order["teya_session_token"] = s["session_token"]
-    elif payment_sim_allowed():
-        pid = f"SIM-{order['id']}"
-        order["gopay_payment_id"] = pid
-        payment_url = f"/pay/{order['id']}"
-        mode = "simulation"
-        await db.sim_payments.insert_one({"id": pid, "state": "CREATED", "order_id": order["id"]})
-    else:
-        raise HTTPException(503, "Online payments are temporarily unavailable")
-    await db.orders.insert_one(order)
-    logger.warning("Upgrade order %s created for ticket %s (%s)", order["id"], t["code"], data.email.lower())
-    return {
-        "order_id": order["id"],
-        "payment_url": payment_url,
-        "mode": mode,
-        "amount_czk": order["amount_czk"],
-        "currency": "CZK",
-        "session_token": order.get("teya_session_token"),
-    }
+    order = new_order_doc(
+        event=event, tier_id=vip_tier["id"], tier_name="VIP Upgrade", quantity=1, tickets_per_unit=1,
+        amount=UPGRADE_PRICE_CZK, list_price=UPGRADE_PRICE_CZK, unit_price=UPGRADE_PRICE_CZK,
+        buyer_name=data.name.strip(), buyer_email=data.email, buyer_phone=data.phone, request=request,
+        kind="upgrade", upgrade_ticket_code=t["code"], upgrade_vip_tier_id=vip_tier["id"],
+    )
+    resp = await create_payment_and_store(order)
+    logger.warning("Upgrade order %s created for ticket %s (%s)", order["id"], t["code"], order["buyer_email"])
+    return resp
 
 
 @api_router.get("/orders/{order_id}/status")
@@ -1480,35 +1474,44 @@ async def gopay_return(id: str = Query(...)):
     dest = f"{SITE_URL}/success?order_id={order['id']}" if order else f"{SITE_URL}/success"
     return RedirectResponse(dest)
 
+def _teya_signature_ok(raw: bytes, sig: str) -> bool:
+    import textwrap
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+    try:
+        b64 = "".join(TEYA_WEBHOOK_PUBLIC_KEY.split())
+        if "BEGIN PUBLIC KEY" not in b64:
+            b64 = "-----BEGIN PUBLIC KEY-----\n" + "\n".join(textwrap.wrap(b64, 64)) + "\n-----END PUBLIC KEY-----\n"
+        pk = serialization.load_pem_public_key(b64.encode())
+        pk.verify(base64.b64decode(sig), raw, asym_padding.PKCS1v15(), hashes.SHA256())
+        return True
+    except Exception:
+        return False
+
+
+def _teya_event_session_id(event: dict):
+    data = event.get("data", event)
+    return data.get("session_id") or data.get("checkout_session_id") or data.get("id")
+
+
 @api_router.post("/payments/teya/notify")
 async def teya_notification(request: Request):
     raw = await request.body()
     if TEYA_WEBHOOK_PUBLIC_KEY:
         sig = request.headers.get("X-Teya-Signature", "")
-        try:
-            import textwrap
-            from cryptography.hazmat.primitives import hashes, serialization
-            from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
-            b64 = "".join(TEYA_WEBHOOK_PUBLIC_KEY.split())
-            if "BEGIN PUBLIC KEY" not in b64:
-                b64 = "-----BEGIN PUBLIC KEY-----\n" + "\n".join(textwrap.wrap(b64, 64)) + "\n-----END PUBLIC KEY-----\n"
-            pk = serialization.load_pem_public_key(b64.encode())
-            pk.verify(base64.b64decode(sig), raw, asym_padding.PKCS1v15(), hashes.SHA256())
-        except Exception:
+        if not _teya_signature_ok(raw, sig):
             # Never reject: the payload is NOT trusted anyway — we only use it as a trigger
             # and re-fetch the authoritative session state from Teya server-to-server below
             # (teya_reconcile verifies merchant_reference + amount + currency against our DB).
             logger.warning("Teya webhook signature check failed (sig len %d) — reconciling server-side anyway", len(sig))
-    import json as _json
     try:
-        event = _json.loads(raw)
+        event = json.loads(raw)
     except Exception:
         raise HTTPException(400, "Bad payload")
     event_id = event.get("id") or event.get("event_id")
     if event_id and await db.meta_events.find_one({"event_id": f"teya_{event_id}"}):
         return {"ok": True}
-    data = event.get("data", event)
-    sid = data.get("session_id") or data.get("checkout_session_id") or data.get("id")
+    sid = _teya_event_session_id(event)
     if sid:
         try:
             await teya_reconcile(sid)
@@ -1684,87 +1687,95 @@ async def scan_checkin(data: ScanIn, admin=Depends(get_current_admin)):
 
 # ---------------- admin ----------------
 
-@api_router.get("/admin/stats")
-async def admin_stats(admin=Depends(get_current_admin)):
-    orders = await db.orders.find({}, {"_id": 0}).to_list(100000)
-    # "Tickets sold" = every QR ticket ever generated (paid, guest list, ambassador rewards, comps)
-    tickets_sold = await db.tickets.count_documents({})
-    checked_in = await db.tickets.count_documents({"status": "used"})
-    tiers = await db.ticket_tiers.find({}, {"_id": 0}).to_list(100)
-    tier_price = {t["id"]: t["price_czk"] for t in tiers}
+def is_paid(order: dict) -> bool:
+    return (order.get("payment_status") or "paid_mock") in ("paid", "paid_mock")
 
-    paid_orders = [o for o in orders if (o.get("payment_status") or "paid_mock") in ("paid", "paid_mock")]
-    revenue = sum(o["amount_czk"] for o in paid_orders)
 
-    def _list_value(o):
+def order_ticket_count(order: dict) -> int:
+    return order["quantity"] * order.get("tickets_per_unit", 1)
+
+
+def revenue_check_stats(paid_orders: list, tier_price: dict) -> dict:
+    def list_value(o):
         if o.get("tier_name") == "VIP GOLD":
             return o["amount_czk"]  # per-table pricing, no list math
         return (o.get("list_price_czk") or o["amount_czk"]) * o["quantity"]
 
-    list_total = sum(_list_value(o) for o in paid_orders)
-    promo_discount = sum(
-        max(0, (o.get("list_price_czk") or 0) * o["quantity"] - o["amount_czk"])
-        for o in paid_orders if o.get("promo_code")
-    )
     comps = [o for o in paid_orders if o.get("comp") and not o.get("guest_list")]
-    comp_tickets = sum(o["quantity"] * o.get("tickets_per_unit", 1) for o in comps)
-    comp_nominal = sum(o["quantity"] * o.get("tickets_per_unit", 1) * tier_price.get(o["tier_id"], 0) for o in comps)
+    return {
+        "list_total_czk": sum(list_value(o) for o in paid_orders),
+        "comp_tickets": sum(order_ticket_count(o) for o in comps),
+        "comp_nominal_czk": sum(order_ticket_count(o) * tier_price.get(o["tier_id"], 0) for o in comps),
+        "promo_discount_czk": sum(
+            max(0, (o.get("list_price_czk") or 0) * o["quantity"] - o["amount_czk"])
+            for o in paid_orders if o.get("promo_code")
+        ),
+    }
 
+
+async def per_tier_stats(tiers: list, paid_orders: list) -> list:
     revenue_by_tier = {}
     for o in paid_orders:
         revenue_by_tier[o["tier_id"]] = revenue_by_tier.get(o["tier_id"], 0) + o["amount_czk"]
-
-    per_tier = []
+    out = []
     for t in tiers:
         sold = await db.tickets.count_documents({"tier_id": t["id"]})
-        per_tier.append({"name": t["name"], "sold": sold, "capacity": t["capacity"],
-                         "revenue": revenue_by_tier.get(t["id"], 0)})
-    recent_scans = await db.tickets.find({"status": "used"}, {"_id": 0}).sort("checked_in_at", -1).to_list(20)
+        out.append({"name": t["name"], "sold": sold, "capacity": t["capacity"],
+                    "revenue": revenue_by_tier.get(t["id"], 0)})
+    return out
 
-    std_sold = await db.tickets.count_documents({"tier_name": "Standard Ticket", "guest_list": {"$ne": True}})
-    std_checked = await db.tickets.count_documents({"tier_name": "Standard Ticket", "guest_list": {"$ne": True}, "status": "used"})
-    vip_sold = await db.tickets.count_documents({"tier_name": "VIP Table Ticket"})
-    vip_checked = await db.tickets.count_documents({"tier_name": "VIP Table Ticket", "status": "used"})
-    guest_sent = await db.tickets.count_documents({"guest_list": True})
-    guest_checked = await db.tickets.count_documents({"guest_list": True, "status": "used"})
-    vip_guest_list = await db.tickets.find({"guest_list": True}, {"_id": 0, "code": 1, "buyer_email": 1, "created_at": 1, "status": 1}).sort("created_at", -1).to_list(500)
 
-    ambs = await db.ambassadors.find({}, {"_id": 0}).to_list(500)
-    ambassadors_overview = {"active": 0, "total_sales": 0, "std_eligible": 0, "std_sent": 0,
-                            "vip_eligible": 0, "vip_sent": 0, "fifty_eligible": 0, "fifty_redeemed": 0}
-    for a in ambs:
+async def _sold_and_checked(query: dict) -> dict:
+    return {"sold": await db.tickets.count_documents(query),
+            "checked_in": await db.tickets.count_documents({**query, "status": "used"})}
+
+
+async def category_stats() -> dict:
+    guest = await _sold_and_checked({"guest_list": True})
+    return {
+        "standard": await _sold_and_checked({"tier_name": "Standard Ticket", "guest_list": {"$ne": True}}),
+        "vip": await _sold_and_checked({"tier_name": "VIP Table Ticket"}),
+        "vip_guest_list": {"sent": guest["sold"], "checked_in": guest["checked_in"]},
+    }
+
+
+async def ambassadors_overview() -> dict:
+    ov = {"active": 0, "total_sales": 0, "std_eligible": 0, "std_sent": 0,
+          "vip_eligible": 0, "vip_sent": 0, "fifty_eligible": 0, "fifty_redeemed": 0}
+    for a in await db.ambassadors.find({}, {"_id": 0}).to_list(500):
         st = await ambassador_public_state(a)
-        if a.get("active"):
-            ambassadors_overview["active"] += 1
-        ambassadors_overview["total_sales"] += st["sales"]
-        if st["std_eligible"]:
-            ambassadors_overview["std_eligible"] += 1
-        if (a.get("reward_standard") or {}).get("sent"):
-            ambassadors_overview["std_sent"] += 1
-        if st["vip_eligible"]:
-            ambassadors_overview["vip_eligible"] += 1
-        if (a.get("reward_vip") or {}).get("sent"):
-            ambassadors_overview["vip_sent"] += 1
-        if st["fifty_eligible"]:
-            ambassadors_overview["fifty_eligible"] += 1
-        if (a.get("fifty") or {}).get("redeemed"):
-            ambassadors_overview["fifty_redeemed"] += 1
+        ov["active"] += bool(a.get("active"))
+        ov["total_sales"] += st["sales"]
+        ov["std_eligible"] += bool(st["std_eligible"])
+        ov["std_sent"] += bool((a.get("reward_standard") or {}).get("sent"))
+        ov["vip_eligible"] += bool(st["vip_eligible"])
+        ov["vip_sent"] += bool((a.get("reward_vip") or {}).get("sent"))
+        ov["fifty_eligible"] += bool(st["fifty_eligible"])
+        ov["fifty_redeemed"] += bool((a.get("fifty") or {}).get("redeemed"))
+    return ov
 
-    return {"revenue_czk": revenue, "orders": len(paid_orders), "tickets_sold": tickets_sold,
-            "checked_in": checked_in, "per_tier": per_tier, "recent_scans": recent_scans,
-            "categories": {
-                "standard": {"sold": std_sold, "checked_in": std_checked},
-                "vip": {"sold": vip_sold, "checked_in": vip_checked},
-                "vip_guest_list": {"sent": guest_sent, "checked_in": guest_checked},
-            },
-            "vip_guest_list": vip_guest_list,
-            "ambassadors": ambassadors_overview,
-            "revenue_check": {
-                "list_total_czk": list_total,
-                "comp_tickets": comp_tickets,
-                "comp_nominal_czk": comp_nominal,
-                "promo_discount_czk": promo_discount,
-            }}
+
+@api_router.get("/admin/stats")
+async def admin_stats(admin=Depends(get_current_admin)):
+    orders = await db.orders.find({}, {"_id": 0}).to_list(100000)
+    tiers = await db.ticket_tiers.find({}, {"_id": 0}).to_list(100)
+    paid_orders = [o for o in orders if is_paid(o)]
+    tier_price = {t["id"]: t["price_czk"] for t in tiers}
+    return {
+        "revenue_czk": sum(o["amount_czk"] for o in paid_orders),
+        "orders": len(paid_orders),
+        # "Tickets sold" = every QR ticket ever generated (paid, guest list, ambassador rewards, comps)
+        "tickets_sold": await db.tickets.count_documents({}),
+        "checked_in": await db.tickets.count_documents({"status": "used"}),
+        "per_tier": await per_tier_stats(tiers, paid_orders),
+        "recent_scans": await db.tickets.find({"status": "used"}, {"_id": 0}).sort("checked_in_at", -1).to_list(20),
+        "categories": await category_stats(),
+        "vip_guest_list": await db.tickets.find(
+            {"guest_list": True}, {"_id": 0, "code": 1, "buyer_email": 1, "created_at": 1, "status": 1}
+        ).sort("created_at", -1).to_list(500),
+        "ambassadors": await ambassadors_overview(),
+        "revenue_check": revenue_check_stats(paid_orders, tier_price),
+    }
 
 
 @api_router.post("/admin/tickets/{code}/reset-checkin")
