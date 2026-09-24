@@ -1,0 +1,70 @@
+[
+ {
+  "id": "a51d7a78d819484c8aae7709281c5bb1",
+  "created_at": "2026-09-08T23:52:28.975505+00:00",
+  "updated_at": "2026-09-11T13:08:43.704872+00:00",
+  "event_id": "d8c05e8481fb4540a2cecd798ba837d3",
+  "event_name": "ASIA TAKEOVER FESTIVAL 2026",
+  "tier_id": "af74c986431a4382be713927a5306eb2",
+  "tier_name": "Standard Ticket",
+  "quantity": 1,
+  "amount_czk": 549,
+  "list_price_czk": 549,
+  "unit_price_czk": 549,
+  "promo_code": null,
+  "discount_percent": null,
+  "currency": "CZK",
+  "buyer_name": "Jonh Lee",
+  "buyer_email": "mildaleso@gmail.com",
+  "buyer_phone": "7255885540011",
+  "payment_status": "paid",
+  "gopay_payment_id": null,
+  "paid_at": "2026-09-11T13:08:43.704833+00:00",
+  "fulfillment_status": "fulfilled",
+  "marketing_consent": true,
+  "attribution": {
+   "first_touch": {
+    "utm_source": "ig",
+    "utm_medium": "social",
+    "utm_content": "link_in_bio",
+    "fbclid": "PAcGRvZgJmZGlkFlDgb1niTVeAzL9wNuKIyXuvI_YgYTJleHRuA2FlbQIxMQBzcnRjBmFwcF9pZA8xMjQwMjQ1NzQyODc0MTQAAaewYOVeht4wQQs_PPwHVSAggvfrM0tY6ukozVkEw4FD5UOEmc4hGTtQoMcgYg_aem_rhxdlaIWhhZxHLGCQE0bFA",
+    "ts": 1788856121889
+   },
+   "last_touch": {
+    "utm_source": "ig",
+    "utm_medium": "social",
+    "utm_content": "link_in_bio",
+    "fbclid": "PAcGRvZgJmZGlkFlDgbioT_rTXBJMHtqQ-qI4Tky0WHVVleHRuA2FlbQIxMQBzcnRjBmFwcF9pZA8xMjQwMjQ1NzQyODc0MTQAAaf9Xcw4e9ucYB6noFi16OwVH-0YOsaVb_Dsw_lA5n2cj-oUw3GCDI0ybyIA6g_aem_5nKy4cfCCK3IlvmjDw3rTw",
+    "ts": 1788911485002
+   },
+   "fbp": "fb.1.1788856124632.714450534352857585",
+   "fbc": "fb.1.1788911485751.PAcGRvZgJmZGlkFlDgbioT_rTXBJMHtqQ-qI4Tky0WHVVleHRuA2FlbQIxMQBzcnRjBmFwcF9pZA8xMjQwMjQ1NzQyODc0MTQAAaf9Xcw4e9ucYB6noFi16OwVH-0YOsaVb_Dsw_lA5n2cj-oUw3GCDI0ybyIA6g_aem_5nKy4cfCCK3IlvmjDw3rTw",
+   "event_source_url": "https://asiatakeover.com/tickets"
+  },
+  "client_ip": "46.135.29.223",
+  "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/23G83 Instagram 445.0.0.34.44 (iPhone18,1; iOS 26_6_1; en_GB; en-GB; scale=3.00; 1206x2622; IABMV/1; 1053791553) Safari/604.1",
+  "teya_session_id": "01a0836f-fdb6-7287-bb64-b8cb48f95585",
+  "payment_provider": "teya",
+  "teya_session_token": "_0XBPWQQ_0364a6b2-915d-4072-adb7-89b23f80c61c",
+  "ticket_email_error": null,
+  "ticket_email_id": "da84315c-59cc-435d-8351-bfe66f071bda",
+  "ticket_email_sent_at": "2026-09-11T13:08:44.009709+00:00",
+  "tickets": [
+   {
+    "id": "2b2be3fd2dff41b0973244f864d55053",
+    "code": "ATF-39C277",
+    "order_id": "a51d7a78d819484c8aae7709281c5bb1",
+    "event_id": "d8c05e8481fb4540a2cecd798ba837d3",
+    "event_name": "ASIA TAKEOVER FESTIVAL 2026",
+    "tier_id": "af74c986431a4382be713927a5306eb2",
+    "tier_name": "Standard Ticket",
+    "holder_name": "Jonh Lee",
+    "buyer_email": "mildaleso@gmail.com",
+    "status": "valid",
+    "created_at": "2026-09-11T13:08:43.710536+00:00",
+    "checked_in_at": null,
+    "checked_in_by": null
+   }
+  ]
+ }
+]
