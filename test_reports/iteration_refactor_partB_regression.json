@@ -1,0 +1,102 @@
+{
+  "summary": "Post-refactor Part B regression (server.py splits + Admin.js/Tickets.js/Scanner.js modularization + useTeyaCheckout shared hook). Backend API sanity: 8/8 pytest pass. Frontend: all critical checkout flows work — Standard tier qty updates (499->998), apply-guard toast when submitting with unapplied promo, valid MZYPL5BKOD -> '−95% (list price 499 Kč)' with total 25 Kč, invalid promo (no crash), referral T5915F8 auto-applies with exactly ONE 'Discount applied — 50 Kč off per ticket' toast and total 449 Kč, Group modal (1 996 Kč, no quantity select), Gold modal (no promo, guests 4→7 595 / 6→9 393 / 14→16 585 Kč), Teya embedded container mounts with Czech card form (Zaplatit 25,00 Kč) for both Standard checkout AND /upgrade (STOPPED before card entry). /upgrade: unknown code -> 'Ticket not found', ATF-63BBC9 -> 'Pay upgrade — 400 Kč'. /vi/upgrade renders Vietnamese copy. Admin: all 7 tabs load, no infinite fetch loops, Overview shows category cards + revenue check + stats. Ambassador inline Edit shows Save/Cancel and Cancel closes cleanly. Scanner /nascanujtobrasko: valid ATF-63BBC9 -> VALID TICKET panel + door log entry; camera button labelled 'Start Camera Scan', doesn't crash in headless. No console runtime errors introduced by refactor.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Admin > Messages tab (top filter dropdown)",
+        "issues": [
+          "Filter dropdown labels ('5th Saigon', '6th Mainstream', '7th Seoul') are inconsistent with the per-card floor select labels required by spec ('Saigon Floor (5th)', 'Seoul Floor (7th)'). Also, '6th Mainstream' is included as an active filter option even though 'Mainstream Floor (6th)' is a legacy value that cannot be assigned (backend PUT /api/admin/messages/{id} correctly returns 400 for this floor, confirmed). Filter-only inclusion is defensible for browsing legacy records, but the label wording should be aligned across the two dropdowns."
+        ]
+      }
+    ]
+  },
+  "detailed_findings": {
+    "backend_api": {
+      "GET /api/site": "200, tiers list present",
+      "POST /api/upgrade/check {ATF-63BBC9}": "200, price_czk=400",
+      "POST /api/upgrade/check {nope}": "404",
+      "POST /api/orders/create invalid promo": "400 (uses tier_id field; body contains 'discount')",
+      "POST /api/orders/create gold + promo": "400 with 'gold' in message",
+      "POST /api/reservations floor='Mainstream Floor (6th)'": "400 (invalid floor)",
+      "PUT /api/admin/messages/{id} floor='Mainstream Floor (6th)'": "400 with 'floor' in message",
+      "GET /api/admin/stats": "200; all required keys present: revenue_czk, tickets_sold, categories(standard/vip/vip_guest_list), revenue_check, ambassadors, per_tier",
+      "note": "Original spec used 'tier' key in /api/orders/create payload — actual schema requires 'tier_id'; test file adjusted accordingly. Behaviour otherwise unchanged."
+    },
+    "checkout_modal_standard": {
+      "qty_1_pay": "Continue to Payment — 499 Kč",
+      "qty_2_pay": "Continue to Payment — 998 Kč",
+      "type_promo_then_submit_without_apply": "Apply-guard toast shown ('Click Apply' text present), NO order created",
+      "MZYPL5BKOD_apply": "Line 'Code MZYPL5BKOD applied: -95% (list price 499 Kč)'; toast 'Discount applied — 95% off'; pay button 'Continue to Payment — 25 Kč'",
+      "invalid_promo": "No crash; total resets; captured no toast text (toast auto-dismisses quickly)",
+      "teya_mount_on_submit": "data-testid='teya-checkout-container' mounted; 3 Teya iframes (cdn.teya.com/checkout.html, applePay.html, checkout-c.teya.com/collector); Czech card form visible ('Zaplatit 25,00 Kč', Jméno/Číslo/Platnost/CVC). STOPPED — no card data entered."
+    },
+    "checkout_modal_referral": {
+      "url": "/tickets?ref=T5915F8",
+      "promo_prefilled": "T5915F8",
+      "discount_applied_toast_count": 1,
+      "toast_text": "Discount applied — 50 Kč off per ticket",
+      "total_after_apply": "449 Kč"
+    },
+    "checkout_modal_group": {
+      "quantity_select_count": 0,
+      "note_visible": "'1 group = 4 tickets'",
+      "total": "1 996 Kč"
+    },
+    "checkout_modal_gold": {
+      "promo_inputs": 0,
+      "guests_options_count": 11,
+      "totals": { "4": "7 595 Kč", "6": "9 393 Kč", "14": "16 585 Kč" }
+    },
+    "upgrade": {
+      "unknown_code": "'Ticket not found' text rendered",
+      "valid_code_ATF-63BBC9": "Ticket Found + 'Pay upgrade — 400 Kč'",
+      "submit_teya_mount": "teya-checkout-container mounted (STOPPED before card entry)",
+      "/vi/upgrade": "Vietnamese copy: 'Nâng cấp', 'vé', 'Kiểm tra', 'Mã vé' — OK"
+    },
+    "admin_tabs_no_infinite_loop": {
+      "orders": {"initial": {"admin/ambassadors": 2, "admin/orders": 2}, "after_idle_diff": {}, "loop": false},
+      "parties": {"initial": {"admin/events": 2}, "after_idle_diff": {}, "loop": false},
+      "ticket_tiers": {"initial": {"admin/tiers": 2, "admin/events": 2}, "after_idle_diff": {}, "loop": false},
+      "site_content": {"initial": {}, "after_idle_diff": {}, "loop": false},
+      "messages": {"initial": {"admin/messages": 2}, "after_idle_diff": {}, "loop": false},
+      "ambassadors": {"initial": {"admin/ambassadors": 2}, "after_idle_diff": {}, "loop": false},
+      "note": "Initial doubled fetches are React 18 StrictMode dev double-invocation; no fetches after 3s idle window on any tab."
+    },
+    "ambassadors_edit": "Edit button opens inline edit fields; Save + Cancel both visible; Cancel returns to normal card view without saving. Stories +/- buttons present (+ ok; - button click test skipped due to selector ambiguity, but visually correct with data-testid attributes in place).",
+    "scanner": {
+      "valid_ATF-63BBC9": "VALID TICKET panel shows holder 'Sim Guard Test' + tier '1ST RELEASE' + 'Admit — Check In' button (NOT clicked — real customer ticket)",
+      "door_log": "ATF-63BBC9 VALID entry appears in Door Log",
+      "invalid_ATF-ZZZZZZ": "Panel state not captured on this run (auto-reset likely fired before scrape) — prior iteration confirmed invalid entries do log; probable timing artefact.",
+      "start_camera_scan_headless": "Button visible; clicking does not crash (headless Chromium provides fake camera device, so getUserMedia succeeds and no error toast is fired — expected in this environment)."
+    }
+  },
+  "critical_code_review_comments": [
+    "Messages FILTER dropdown label wording ('5th Saigon' / '7th Seoul') diverges from the per-card floor select label wording required by spec ('Saigon Floor (5th)' / 'Seoul Floor (7th)'). Align both to the same style for consistency.",
+    "Recharts 'width(-1) height(-1)' warnings still emitted from Overview chart before container gets first paint dimensions (flagged in previous report, still present).",
+    "Persistent React 19 hydration warning: '<span> cannot be a child of <option>' — introduced by editor instrumentation injecting <span data-ve-dynamic> inside <option>. Non-blocking, but pollutes console.",
+    "Frontend continues to fire 4-5 x /api/gate/status 401 probes before login on /admin and /nascanujtobrasko — no functional impact, but adds console noise. Consider suppressing 401 log for auth-probe endpoints.",
+    "server.py /api/orders/create request body uses 'tier_id' (required); the review-request wording ('tier: standard') is stale — no code fix needed, doc only."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_api_sanity_batch.py",
+    "/app/test_reports/pytest/api_sanity_batch.xml"
+  ],
+  "action_items": [
+    "(Design) Align Admin > Messages filter dropdown labels to 'Saigon Floor (5th)' / 'Seoul Floor (7th)' / 'No floor filter' (or the reverse — pick one style consistently across filter + per-card select).",
+    "(Minor) Fix Recharts container sizing to remove width(-1)/height(-1) warnings on Overview.",
+    "(Minor) Drop editor-instrumentation <span data-ve-dynamic> injection inside <option> to clear the React hydration warning."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_api_sanity_batch.py (new)"
+  ],
+  "success_rate": { "backend": "100% (8/8)", "frontend": "100% of tested flows" },
+  "test_credentials": "admin@asiatakeover.eu / Takeover2026! (from /app/memory/test_credentials.md). Ambassador T5915F8 (-50 Kč). Promo MZYPL5BKOD (-95%). Sample paid ticket for /upgrade: ATF-63BBC9.",
+  "seed_data_creation": "None. No admin data was saved (Cancel used on Ambassador Edit). No card details entered — no Teya orders completed. No orders created in DB. Cleanup: DELETE /api/admin/orders/{id} not needed (no created orders).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Refactor Part B is behavior-preserving in all tested surfaces. If retesting: use tier_id in /api/orders/create (not 'tier'). Preview runs REAL Teya — NEVER complete card entry. Two floor dropdowns exist in Admin > Messages: a top filter (uses '5th Saigon'/'6th Mainstream'/'7th Seoul') and a per-card edit select (uses 'Saigon Floor (5th)'/'Seoul Floor (7th)' per spec) — label wording inconsistency to flag.",
+  "rca of the issue": "N/A — no regressions detected in this batch."
+}

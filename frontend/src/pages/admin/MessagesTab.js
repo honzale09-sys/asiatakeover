@@ -8,7 +8,7 @@ import { filterMessages } from "./messageUtils";
 const FILTER_DEFAULTS = { floor: "all", statusF: "all", sort: "newest", minG: "", maxG: "", search: "" };
 
 const SELECTS = [
-  ["floor", "Floor", "messages-filter-floor", [["all", "All floors"], ["saigon", "5th Saigon"], ["mainstream", "6th Mainstream"], ["seoul", "7th Seoul"]]],
+  ["floor", "Floor", "messages-filter-floor", [["all", "All floors"], ["saigon", "Saigon Floor (5th)"], ["seoul", "Seoul Floor (7th)"], ["mainstream", "Mainstream Floor (6th) — legacy"]]],
   ["statusF", "Status", "messages-filter-status", [["all", "All active"], ["new", "New"], ["contacted", "Contacted"], ["confirmed", "Confirmed"], ["declined", "Declined"], ["removed", "Removed"]]],
   ["sort", "Sort", "messages-filter-sort", [["newest", "Newest"], ["oldest", "Oldest"], ["guests-asc", "Guests low–high"], ["guests-desc", "Guests high–low"]]],
 ];
