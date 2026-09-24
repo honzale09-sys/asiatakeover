@@ -995,6 +995,105 @@ async def admin_ambassador_qr(amb_id: str, admin=Depends(get_current_admin)):
                     headers={"Content-Disposition": f"attachment; filename=referral-{amb['code']}.png"})
 
 
+# ---------------- discount codes admin ----------------
+
+class PromoIn(BaseModel):
+    code: Optional[str] = Field(default=None, max_length=24)
+    percent_off: Optional[int] = Field(default=None, ge=1, le=100)
+    amount_off_czk: Optional[int] = Field(default=None, ge=1, le=5000)
+    max_uses: Optional[int] = Field(default=None, ge=1, le=100000)
+    active: bool = True
+    note: str = Field(default="", max_length=200)
+
+
+class PromoEditIn(BaseModel):
+    percent_off: Optional[int] = Field(default=None, ge=1, le=100)
+    amount_off_czk: Optional[int] = Field(default=None, ge=1, le=5000)
+    max_uses: Optional[int] = Field(default=None, ge=0, le=100000)  # 0 = unlimited
+    active: Optional[bool] = None
+    note: Optional[str] = Field(default=None, max_length=200)
+
+
+async def promo_uses_left(promo: dict) -> Optional[int]:
+    """Discounted tickets left on a promo code, or None when the code is unlimited."""
+    if not promo.get("max_uses"):
+        return None
+    return max(0, promo["max_uses"] - await code_tickets_sold(promo["code"]))
+
+
+async def promo_public_state(p: dict) -> dict:
+    used = await code_tickets_sold(p["code"])
+    return {
+        "code": p["code"],
+        "percent_off": p.get("percent_off"),
+        "amount_off_czk": p.get("amount_off_czk"),
+        "max_uses": p.get("max_uses"),
+        "active": bool(p.get("active")),
+        "note": p.get("note") or "",
+        "created_at": p.get("created_at"),
+        "uses": used,
+        "uses_left": max(0, p["max_uses"] - used) if p.get("max_uses") else None,
+        "orders": await db.orders.count_documents({"promo_code": p["code"], "payment_status": "paid"}),
+    }
+
+
+@api_router.get("/admin/promo-codes")
+async def admin_promo_list(admin=Depends(get_current_admin)):
+    codes = await db.promo_codes.find({}, {"_id": 0}).to_list(500)
+    codes.sort(key=lambda p: p.get("created_at") or "", reverse=True)
+    return [await promo_public_state(p) for p in codes]
+
+
+@api_router.post("/admin/promo-codes")
+async def admin_promo_create(data: PromoIn, admin=Depends(get_current_admin)):
+    code = (data.code or "").strip().upper() or ("ATF" + secrets.token_hex(3).upper())
+    if not re.fullmatch(r"[A-Z0-9-]{3,24}", code):
+        raise HTTPException(400, "Code must be 3–24 chars: letters, numbers, dashes")
+    if bool(data.percent_off) == bool(data.amount_off_czk):
+        raise HTTPException(400, "Set either a percent discount or a fixed CZK amount")
+    if await db.promo_codes.find_one({"code": code}) or await db.ambassadors.find_one({"code": code}):
+        raise HTTPException(409, "This code is already taken")
+    doc = {
+        "code": code, "percent_off": data.percent_off, "amount_off_czk": data.amount_off_czk,
+        "max_uses": data.max_uses, "active": data.active, "note": data.note.strip(),
+        "created_at": utcnow().isoformat(), "created_by": admin.get("email"),
+    }
+    await db.promo_codes.insert_one(dict(doc))
+    logger.warning("ADMIN %s created discount code %s", admin.get("email"), code)
+    return await promo_public_state(doc)
+
+
+@api_router.put("/admin/promo-codes/{code}")
+async def admin_promo_edit(code: str, data: PromoEditIn, admin=Depends(get_current_admin)):
+    c = code.strip().upper()
+    if not await db.promo_codes.find_one({"code": c}):
+        raise HTTPException(404, "Code not found")
+    upd = data.model_dump(exclude_none=True)
+    if not upd:
+        raise HTTPException(400, "Nothing to update")
+    if upd.get("max_uses") == 0:
+        upd["max_uses"] = None
+    if upd.get("percent_off"):
+        upd["amount_off_czk"] = None
+    elif upd.get("amount_off_czk"):
+        upd["percent_off"] = None
+    await db.promo_codes.update_one({"code": c}, {"$set": upd})
+    logger.warning("ADMIN %s edited discount code %s: %s", admin.get("email"), c, list(upd))
+    return await promo_public_state(await db.promo_codes.find_one({"code": c}, {"_id": 0}))
+
+
+@api_router.delete("/admin/promo-codes/{code}")
+async def admin_promo_delete(code: str, admin=Depends(get_current_admin)):
+    c = code.strip().upper()
+    if await code_tickets_sold(c):
+        raise HTTPException(400, "This code was already used — deactivate it instead of deleting")
+    result = await db.promo_codes.delete_one({"code": c})
+    if not result.deleted_count:
+        raise HTTPException(404, "Code not found")
+    logger.warning("ADMIN %s deleted discount code %s", admin.get("email"), c)
+    return {"ok": True}
+
+
 # ---------------- fulfillment & reconciliation ----------------
 
 async def fulfill_upgrade(order: dict):
@@ -1116,13 +1215,17 @@ AMB_MAX_USES = 10
 FIFTY_WINDOW_DAYS = 14
 
 
-async def ambassador_sales(code: str) -> int:
-    """Paid, non-refunded tickets bought with this ambassador code (each ticket = 1 sale)."""
+async def code_tickets_sold(code: str) -> int:
+    """Paid, non-refunded tickets bought with this discount code (each ticket = 1 use)."""
     orders = await db.orders.find(
         {"promo_code": code.strip().upper(), "payment_status": "paid"},
         {"_id": 0, "quantity": 1, "tickets_per_unit": 1},
     ).to_list(100000)
     return sum(o["quantity"] * o.get("tickets_per_unit", 1) for o in orders)
+
+
+async def ambassador_sales(code: str) -> int:
+    return await code_tickets_sold(code)
 
 
 async def ambassador_public_state(amb: dict) -> dict:
@@ -1164,7 +1267,17 @@ async def promo_validate(code: str):
     c = code.strip().upper()
     promo = await db.promo_codes.find_one({"code": c, "active": True})
     if promo:
-        return {"valid": True, "percent_off": promo["percent_off"]}
+        left = await promo_uses_left(promo)
+        if left == 0:
+            return {"valid": False, "reason": "This code has no discounted tickets left"}
+        out = {"valid": True}
+        if promo.get("amount_off_czk"):
+            out["amount_off_czk"] = promo["amount_off_czk"]
+        else:
+            out["percent_off"] = promo.get("percent_off") or 0
+        if left is not None:
+            out["uses_left"] = left
+        return out
     amb = await db.ambassadors.find_one({"code": c, "active": True})
     if amb:
         sales = await ambassador_sales(c)
@@ -1224,7 +1337,15 @@ async def apply_discount_code(code: str, unit_price: int, quantity: int, restric
     c = code.strip().upper()
     promo = await db.promo_codes.find_one({"code": c, "active": True})
     if promo:
-        pct = promo["percent_off"]
+        left = await promo_uses_left(promo)
+        if left is not None:
+            if left <= 0:
+                raise HTTPException(400, "This code has no discounted tickets left")
+            if quantity > left:
+                raise HTTPException(400, f"This code has only {left} discounted ticket(s) left")
+        if promo.get("amount_off_czk"):
+            return max(1, unit_price - promo["amount_off_czk"]), None, c
+        pct = promo.get("percent_off") or 0
         return max(1, round(unit_price * (100 - pct) / 100)), pct, c
     amb = await db.ambassadors.find_one({"code": c, "active": True})
     if amb:
@@ -1776,6 +1897,31 @@ async def admin_stats(admin=Depends(get_current_admin)):
         "ambassadors": await ambassadors_overview(),
         "revenue_check": revenue_check_stats(paid_orders, tier_price),
     }
+
+
+@api_router.get("/admin/sales-overview")
+async def admin_sales_overview(admin=Depends(get_current_admin)):
+    """Read-only sales rows from successfully paid orders only (free comps / guest list excluded).
+    The admin UI aggregates these per day / category — nothing here writes or changes data."""
+    orders = await db.orders.find(
+        {},
+        {"_id": 0, "created_at": 1, "paid_at": 1, "tier_name": 1, "quantity": 1, "payment_status": 1,
+         "tickets_per_unit": 1, "amount_czk": 1, "comp": 1, "guest_list": 1, "kind": 1},
+    ).to_list(100000)
+    rows = []
+    for o in orders:
+        if not is_paid(o) or o.get("comp") or o.get("guest_list") or o.get("amount_czk", 0) <= 0:
+            continue
+        upper = (o.get("tier_name") or "").upper()
+        rows.append({
+            "date": (o.get("paid_at") or o["created_at"])[:10],
+            "category": "vip" if "VIP" in upper else "standard",
+            # a paid upgrade adds revenue but no new QR ticket
+            "tickets": 0 if o.get("kind") == "upgrade" else o["quantity"] * o.get("tickets_per_unit", 1),
+            "revenue": o["amount_czk"],
+        })
+    rows.sort(key=lambda r: r["date"])
+    return {"today": utcnow().date().isoformat(), "rows": rows}
 
 
 @api_router.post("/admin/tickets/{code}/reset-checkin")

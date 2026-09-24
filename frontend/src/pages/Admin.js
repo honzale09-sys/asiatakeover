@@ -9,6 +9,7 @@ import { TiersTab } from "./admin/TiersTab";
 import { ContentTab } from "./admin/ContentTab";
 import { MessagesTab } from "./admin/MessagesTab";
 import { AmbassadorsTab } from "./admin/AmbassadorsTab";
+import { DiscountCodesTab } from "./admin/DiscountCodesTab";
 
 const TABS = [
   ["overview", "Overview", OverviewTab],
@@ -18,6 +19,7 @@ const TABS = [
   ["content", "Site Content", ContentTab],
   ["messages", "Messages", MessagesTab],
   ["ambassadors", "Ambassadors", AmbassadorsTab],
+  ["discounts", "Discount Codes", DiscountCodesTab],
 ];
 
 export default function Admin() {

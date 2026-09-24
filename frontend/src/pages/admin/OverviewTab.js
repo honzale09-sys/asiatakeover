@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api, formatError, czk } from "@/api";
 import { StatCard, cardCls } from "./shared";
 import { VipGuestListCard } from "./VipGuestListCard";
+import { SalesOverview } from "./SalesOverview";
 
 function CategoryCard({ label, color, data, testid }) {
   return (
@@ -44,26 +44,6 @@ function RevenueCheckCard({ stats }) {
   );
 }
 
-function SalesChart({ data }) {
-  return (
-    <div className={cardCls}>
-      <p className="font-mono2 text-xs uppercase tracking-[0.25em] text-slate-400 mb-6">Sales per tier</p>
-      <div className="h-64" data-testid="sales-chart">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-            <XAxis dataKey="name" tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ background: "#0D0E15", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12 }} labelStyle={{ color: "#00F0FF" }} />
-            <Bar dataKey="sold" name="Sold" fill="#FF0055" radius={[6, 6, 0, 0]} />
-            <Bar dataKey="capacity" name="Capacity" fill="#262739" radius={[6, 6, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
-
 export function OverviewTab() {
   const [stats, setStats] = useState(null);
   const load = useCallback(() => api.get("/admin/stats").then((r) => setStats(r.data)).catch((e) => toast.error(formatError(e))), []);
@@ -83,7 +63,7 @@ export function OverviewTab() {
         <VipGuestListCard stats={stats} onSent={load} />
       </div>
       {stats.revenue_check && <RevenueCheckCard stats={stats} />}
-      <SalesChart data={stats.per_tier} />
+      <SalesOverview />
     </div>
   );
 }
