@@ -2043,9 +2043,13 @@ async def admin_comp_tickets(data: CompTicketIn, admin=Depends(get_current_admin
 @api_router.get("/admin/orders")
 async def admin_orders(include_unpaid: bool = False, admin=Depends(get_current_admin)):
     orders = await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    # one ticket query for all orders — per-order lookups made this endpoint take ~30 s in production
+    by_order = {}
+    for t in await db.tickets.find({}, {"_id": 0, "order_id": 1, "code": 1, "status": 1}).to_list(100000):
+        by_order.setdefault(t.get("order_id"), []).append({"code": t["code"], "status": t.get("status")})
     visible = []
     for o in orders:
-        o["tickets"] = await db.tickets.find({"order_id": o["id"]}, {"_id": 0}).to_list(50)
+        o["tickets"] = by_order.get(o["id"], [])
         o["payment_status"] = o.get("payment_status") or o.get("status", "paid_mock")
         if include_unpaid or o["payment_status"] not in ("created", "pending"):
             visible.append(o)

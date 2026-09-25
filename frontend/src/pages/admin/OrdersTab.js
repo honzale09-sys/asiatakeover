@@ -53,14 +53,19 @@ function useAmbassadorNames() {
 
 export function OrdersTab() {
   const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [showAbandoned, setShowAbandoned] = useState(false);
   const ambNames = useAmbassadorNames();
-  const load = useCallback(
-    () => api.get(`/admin/orders${showAbandoned ? "?include_unpaid=1" : ""}`).then((r) => setOrders(r.data)).catch((e) => toast.error(formatError(e))),
-    [showAbandoned]
-  );
+  const load = useCallback(() => {
+    setLoading(true);
+    return api
+      .get(`/admin/orders${showAbandoned ? "?include_unpaid=1" : ""}`)
+      .then((r) => setOrders(r.data))
+      .catch((e) => toast.error(formatError(e)))
+      .finally(() => setLoading(false));
+  }, [showAbandoned]);
   useEffect(() => { load(); }, [load]);
 
   const run = async (fn) => {
@@ -110,7 +115,10 @@ export function OrdersTab() {
             {filtered.map((o) => (
               <OrderRow key={o.id} o={o} ambNames={ambNames} onSync={syncPayment} onResend={resend} onDelete={removeOrder} />
             ))}
-            {filtered.length === 0 && (
+            {loading && orders.length === 0 && (
+              <tr><td colSpan={HEADERS.length} className="px-4 py-10 text-center text-slate-500 font-mono2 text-xs" data-testid="orders-loading">Loading orders…</td></tr>
+            )}
+            {!loading && filtered.length === 0 && (
               <tr><td colSpan={HEADERS.length} className="px-4 py-10 text-center text-slate-500 font-mono2 text-xs">No orders yet</td></tr>
             )}
           </tbody>
