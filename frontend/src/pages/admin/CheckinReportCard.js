@@ -14,13 +14,13 @@ function exportScansCsv(scans) {
   a.click();
 }
 
-export function CheckinReportCard() {
+export function CheckinReportCard({ refreshKey = 0 }) {
   const [rep, setRep] = useState(null);
   const load = useCallback(
     () => api.get("/admin/checkin-report").then((r) => setRep(r.data)).catch((e) => toast.error(formatError(e))),
     []
   );
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshKey]);
 
   if (!rep) return <div className={cardCls}><p className="font-mono2 text-sm text-slate-500">Loading check-in report…</p></div>;
 

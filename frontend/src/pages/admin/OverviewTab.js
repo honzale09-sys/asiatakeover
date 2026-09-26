@@ -47,8 +47,10 @@ function RevenueCheckCard({ stats }) {
 
 export function OverviewTab() {
   const [stats, setStats] = useState(null);
+  const [tick, setTick] = useState(0);
   const load = useCallback(() => api.get("/admin/stats").then((r) => setStats(r.data)).catch((e) => toast.error(formatError(e))), []);
   useEffect(() => { load(); }, [load]);
+  const reload = useCallback(() => { load(); setTick((t) => t + 1); }, [load]);
   if (!stats) return <p className="font-mono2 text-sm text-slate-500">Loading stats…</p>;
   return (
     <div className="space-y-8" data-testid="admin-overview">
@@ -63,10 +65,10 @@ export function OverviewTab() {
         <CategoryCard label="VIP" color="text-[#C9A227]" data={stats.categories?.vip} testid="cat-vip" />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <GuestListCard category="vip" stats={stats} onSent={load} />
-        <GuestListCard category="standard" stats={stats} onSent={load} />
+        <GuestListCard category="vip" stats={stats} onSent={reload} />
+        <GuestListCard category="standard" stats={stats} onSent={reload} />
       </div>
-      <CheckinReportCard />
+      <CheckinReportCard refreshKey={tick} />
       {stats.revenue_check && <RevenueCheckCard stats={stats} />}
       <SalesOverview />
     </div>

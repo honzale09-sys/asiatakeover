@@ -1,0 +1,24 @@
+{
+  "summary": "End-to-end validation of the new Standard/VIP Guest Lists in Admin Overview and the simplified 4-state door scanner. Backend in-process test (tests/test_guest_list_door.py) passes; UI on preview URL fully verified: sending 3 Standard + 2 VIP guest tickets creates 5 unique QR codes across 2 orders, revenue stays 9 629 K\u010d, Tickets Sold grows 22->27, per-card counters show 3 SENT / 2 SENT and individual entries. Door scanner (/nascanujtobrasko) renders correct 4-state result: cyan STANDARD (wristband + red X NO SURPRISE GIFT), yellow VIP with NO SURPRISE GIFT for guest-list, DECLINED/ALREADY USED with first-scan time + admin email, DECLINED/INVALID for unknown code. Tap dismissal releases the scan guard. Check-in report card matches stat card (14 checked in), Standard Guest List row 3/2, VIP Guest List row 2/1. All required data-testid attributes present.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_guest_list_door.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Check-in report card does not auto-refresh after guest tickets are sent or after a scanner run in another tab; the user must click Refresh. Consider polling or refetching after guest-list POST to keep numbers in sync without manual action.",
+    "console shows one 401 from a background request on /admin and /nascanujtobrasko pre-login (likely /api/site or /api/auth/me probe) \u2014 harmless but noisy in production logs."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@asiatakeover.eu / Takeover2026! (admin + scanner)",
+  "seed_data_creation": "Created 3 Standard + 2 VIP guest tickets during UI test (ATF-4342F9, ATF-1FBE8A, ATF-F9D575, ATF-C6D2E2, ATF-19B500), scanned 3 of them, then deleted both orders and their tickets directly from Mongo to restore baseline.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 4 scanner result screens (scan-screen-standard / -vip / -declined / -offline) exist with the expected data-testids (scan-wristband, scan-gift-no, scan-gift-yes, scan-declined-reason, scan-first-scan-time). Guest list cards use data-testid guest-list-card-{vip|standard} with guest-email-input-, guest-qty-input-, guest-send-button-, guest-stats-, guest-list-. Check-in report uses checkin-report-card / checkin-total / checkin-report-table / checkin-refresh / checkin-export. WAF blocks non-browser UAs on /api/scan/* \u2014 use browser UA for curl."
+}
