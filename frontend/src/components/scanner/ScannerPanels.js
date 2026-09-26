@@ -55,6 +55,7 @@ const STRIP = {
   declined: "border-[#FF0055]/50 bg-[#FF0055]/10 text-[#FF7BA3]",
   error: "border-[#FF6A00]/50 bg-[#FF6A00]/10 text-[#FFB26A]",
 };
+const STRIP_TITLE = { admitted: "Admitted", declined: "Declined", error: "No connection" };
 
 export function LastResultStrip({ last }) {
   if (!last)
@@ -67,7 +68,7 @@ export function LastResultStrip({ last }) {
     <div className={`border rounded-2xl px-4 py-3 ${STRIP[last.result]}`} data-testid="last-result">
       <div className="flex items-baseline justify-between gap-3">
         <p className="font-display font-black uppercase text-lg sm:text-2xl leading-none truncate">
-          {last.result === "admitted" ? "Admitted" : last.result === "declined" ? "Declined" : "No connection"}
+          {STRIP_TITLE[last.result]}
         </p>
         <p className="font-mono2 text-[10px] text-slate-400 shrink-0">{last.at}</p>
       </div>

@@ -1228,22 +1228,34 @@ async def ambassador_sales(code: str) -> int:
     return await code_tickets_sold(code)
 
 
-async def ambassador_public_state(amb: dict) -> dict:
-    sales = await ambassador_sales(amb["code"])
+def ambassador_reward_flags(amb: dict, sales: int) -> dict:
+    """Which ambassador rewards are unlocked right now."""
     std = amb.get("reward_standard") or {}
     vip = amb.get("reward_vip") or {}
-    fifty = amb.get("fifty") or {}
+    return {
+        "std_eligible": sales >= 3 and not std.get("sent"),
+        "vip_eligible": sales >= 5 and not vip.get("sent"),
+        "can_upgrade": sales >= 5 and bool(std.get("sent")) and not vip.get("sent"),
+    }
+
+
+def ambassador_fifty_eligible(amb: dict, sales: int) -> bool:
+    """50 % thank-you code: 8 shared stories, still under 3 sales, inside the activation window."""
+    if amb.get("fifty") or sales >= 3 or amb.get("stories_shared", 0) < 8:
+        return False
     activated = datetime.fromisoformat(amb.get("activated_at") or amb["created_at"])
-    fifty_window_open = datetime.now(timezone.utc) <= activated + timedelta(days=FIFTY_WINDOW_DAYS)
+    return datetime.now(timezone.utc) <= activated + timedelta(days=FIFTY_WINDOW_DAYS)
+
+
+async def ambassador_public_state(amb: dict) -> dict:
+    sales = await ambassador_sales(amb["code"])
     return {
         **{k: v for k, v in amb.items() if k != "_id"},
         "sales": sales,
         "discount_czk": amb.get("discount_czk", AMB_DISCOUNT_CZK),
         "uses_left": max(0, AMB_MAX_USES - sales),
-        "std_eligible": sales >= 3 and not std.get("sent"),
-        "vip_eligible": sales >= 5 and not vip.get("sent"),
-        "can_upgrade": sales >= 5 and bool(std.get("sent")) and not vip.get("sent"),
-        "fifty_eligible": amb.get("stories_shared", 0) >= 8 and sales < 3 and fifty_window_open and not fifty,
+        **ambassador_reward_flags(amb, sales),
+        "fifty_eligible": ambassador_fifty_eligible(amb, sales),
         "referral_url": f"{SITE_URL}/tickets?ref={amb['code']}",
     }
 
@@ -1253,7 +1265,10 @@ async def ambassador_public_state(amb: dict) -> dict:
 _rate_hits = {}
 
 
-def rate_limit(ip: str, limit: int = 10, window: int = 300):
+ORDER_RATE_LIMIT = int(os.environ.get("ORDER_RATE_LIMIT") or 10)
+
+
+def rate_limit(ip: str, limit: int = ORDER_RATE_LIMIT, window: int = 300) -> None:
     now = time.time()
     hits = [t for t in _rate_hits.get(ip, []) if now - t < window]
     if len(hits) >= limit:
@@ -1331,36 +1346,48 @@ async def assert_tier_capacity(tier: dict, quantity: int, tickets_per_unit: int,
         raise HTTPException(400, "Not enough tickets left in this tier")
 
 
-async def apply_discount_code(code: str, unit_price: int, quantity: int):
-    """Resolve promo / ambassador / ambassador-50% codes. Returns (unit_price, discount_percent, code_used).
-    Gold Table and Group of 4 never reach this — no code applies to those tiers."""
-    c = code.strip().upper()
-    promo = await db.promo_codes.find_one({"code": c, "active": True})
-    if promo:
-        left = await promo_uses_left(promo)
-        if left is not None:
-            if left <= 0:
-                raise HTTPException(400, "This code has no discounted tickets left")
-            if quantity > left:
-                raise HTTPException(400, f"This code has only {left} discounted ticket(s) left")
-        if promo.get("amount_off_czk"):
-            return max(1, unit_price - promo["amount_off_czk"]), None, c
-        pct = promo.get("percent_off") or 0
-        return max(1, round(unit_price * (100 - pct) / 100)), pct, c
-    amb = await db.ambassadors.find_one({"code": c, "active": True})
+def assert_uses_left(left: Optional[int], quantity: int) -> None:
+    """left is None for unlimited codes."""
+    if left is None:
+        return
+    if left <= 0:
+        raise HTTPException(400, "This code has no discounted tickets left")
+    if quantity > left:
+        raise HTTPException(400, f"This code has only {left} discounted ticket(s) left")
+
+
+async def resolve_promo_code(code: str, unit_price: int, quantity: int) -> Optional[tuple]:
+    promo = await db.promo_codes.find_one({"code": code, "active": True})
+    if not promo:
+        return None
+    assert_uses_left(await promo_uses_left(promo), quantity)
+    if promo.get("amount_off_czk"):
+        return max(1, unit_price - promo["amount_off_czk"]), None, code
+    pct = promo.get("percent_off") or 0
+    return max(1, round(unit_price * (100 - pct) / 100)), pct, code
+
+
+async def resolve_ambassador_code(code: str, unit_price: int, quantity: int) -> Optional[tuple]:
+    amb = await db.ambassadors.find_one({"code": code, "active": True})
     if amb:
-        left = AMB_MAX_USES - await ambassador_sales(c)
-        if left <= 0:
-            raise HTTPException(400, "This code has no discounted tickets left")
-        if quantity > left:
-            raise HTTPException(400, f"This code has only {left} discounted ticket(s) left")
-        return max(1, unit_price - amb.get("discount_czk", AMB_DISCOUNT_CZK)), None, c
-    amb2 = await db.ambassadors.find_one({"fifty.code": c, "active": True})
-    if amb2 and not amb2["fifty"].get("redeemed"):
+        assert_uses_left(AMB_MAX_USES - await ambassador_sales(code), quantity)
+        return max(1, unit_price - amb.get("discount_czk", AMB_DISCOUNT_CZK)), None, code
+    amb50 = await db.ambassadors.find_one({"fifty.code": code, "active": True})
+    if amb50 and not amb50["fifty"].get("redeemed"):
         if quantity > 1:
             raise HTTPException(400, "This code is valid for one ticket only")
-        return max(1, round(unit_price / 2)), 50, c
-    raise HTTPException(400, "Invalid discount code")
+        return max(1, round(unit_price / 2)), 50, code
+    return None
+
+
+async def apply_discount_code(code: str, unit_price: int, quantity: int) -> tuple:
+    """Resolve promo / ambassador / ambassador-50% codes → (unit_price, discount_percent, code_used).
+    Gold Table and Group of 4 never reach this — no code applies to those tiers."""
+    c = code.strip().upper()
+    resolved = await resolve_promo_code(c, unit_price, quantity) or await resolve_ambassador_code(c, unit_price, quantity)
+    if not resolved:
+        raise HTTPException(400, "Invalid discount code")
+    return resolved
 
 
 def new_order_doc(*, event: dict, tier_id: str, tier_name: str, quantity: int, tickets_per_unit: int,

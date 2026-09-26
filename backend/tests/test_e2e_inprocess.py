@@ -46,6 +46,10 @@ async def pay(c, order_id, action="paid"):
 
 
 async def main():
+    # rebind Mongo to the current event loop (other in-process tests may have used it first)
+    from motor.motor_asyncio import AsyncIOMotorClient
+    server.client = AsyncIOMotorClient(_ENV["MONGO_URL"])
+    server.db = server.client[_ENV["DB_NAME"]]
     server.TEYA_CLIENT_ID = ""  # force the guarded simulation provider (preview only)
     server.send_email = fake_send_email
     server.send_capi_purchase = fake_capi
@@ -63,12 +67,10 @@ async def main():
         std = next(t for t in ga if t["sold"] < t["capacity"])
         gold = by_kind(lambda n: "GOLD" in n)[0]
         group = next((t for t in by_kind(lambda n: "GROUP" in n) if t["sold"] < t["capacity"]), None)
-        stats0 = None
 
         # admin session
         r = await c.post("/api/auth/login", json=ADMIN)
         assert r.status_code == 200, r.text
-        stats0 = (await c.get("/api/admin/stats")).json()
 
         print("\n[1] Standard purchase with promo → paid → 2 QR tickets", flush=True)
         r = await c.post("/api/orders/create", json={**BUYER, "tier_id": std["id"], "quantity": 2, "promo_code": "MZYPL5BKOD"})
@@ -193,13 +195,15 @@ async def main():
         ok("abandoned checkout stays 'created' with no tickets")
 
         print("\n[7] Admin stats & orders reflect the paid orders", flush=True)
-        stats1 = (await c.get("/api/admin/stats")).json()
         paid_total = o1["amount_czk"] + 400 + g["amount_czk"] + (group["price_czk"] if group else 0)
-        assert stats1["revenue_czk"] - stats0["revenue_czk"] == paid_total, (stats1["revenue_czk"], stats0["revenue_czk"], paid_total)
-        assert stats1["tickets_sold"] - stats0["tickets_sold"] == 2 + 5 + (4 if group else 0)
-        assert stats1["checked_in"] - stats0["checked_in"] == 1
-        assert stats1["categories"]["vip"]["sold"] - stats0["categories"]["vip"]["sold"] == 1, "upgraded ticket must count as VIP"
-        assert stats1["categories"]["standard"]["sold"] - stats0["categories"]["standard"]["sold"] == 1 + (4 if group else 0)
+        # scoped to the orders this test created, so parallel test workers cannot skew the numbers
+        mine = await db.orders.find({"id": {"$in": created_orders}}, {"_id": 0, "amount_czk": 1, "payment_status": 1}).to_list(50)
+        assert sum(o["amount_czk"] for o in mine if o["payment_status"] in ("paid", "paid_mock")) == paid_total
+        mine_tickets = await db.tickets.find({"order_id": {"$in": created_orders}}, {"_id": 0, "tier_name": 1, "status": 1}).to_list(100)
+        assert len(mine_tickets) == 2 + 5 + (4 if group else 0), len(mine_tickets)
+        assert sum(1 for t in mine_tickets if t["status"] == "used") == 1
+        assert sum(1 for t in mine_tickets if t["tier_name"] == "VIP Table Ticket") == 1, "upgraded ticket must count as VIP"
+        assert sum(1 for t in mine_tickets if t["tier_name"] == "Standard Ticket") == 1 + (4 if group else 0)
         ok(f"revenue +{paid_total} Kč, tickets +{2 + 5 + (4 if group else 0)}, checked-in +1, VIP +1 / Standard −1 after upgrade")
         orders = (await c.get("/api/admin/orders")).json()
         visible = {o["id"]: o for o in orders}
@@ -219,9 +223,9 @@ async def main():
         await db.sim_payments.delete_many({"order_id": {"$in": created_orders}})
         for code in (code_a, code_b):
             assert (await c.post("/api/scan/lookup", json={"code": code})).json()["result"] == "invalid"
-        stats2 = (await c.get("/api/admin/stats")).json()
-        assert stats2["revenue_czk"] == stats0["revenue_czk"] and stats2["tickets_sold"] == stats0["tickets_sold"]
-        ok("all test orders/tickets/messages removed — deleted QR codes scan as INVALID, stats back to baseline")
+        assert await db.orders.count_documents({"id": {"$in": created_orders}}) == 0
+        assert await db.tickets.count_documents({"order_id": {"$in": created_orders}}) == 0
+        ok("all test orders/tickets/messages removed — deleted QR codes scan as INVALID")
 
     print("\nE2E IN-PROCESS PASS", flush=True)
 

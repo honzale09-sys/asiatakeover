@@ -8,6 +8,12 @@ const RANGES = [["today", "Today", 1], ["3d", "Last 3 days", 3], ["7d", "Last 7 
 const CATS = [["all", "All"], ["standard", "Standard"], ["vip", "VIP"]];
 const METRICS = [["tickets", "Tickets Sold"], ["revenue", "Revenue"]];
 const COLOR = { standard: "#00F0FF", vip: "#C9A227" };
+const AXIS_TICK = { fill: "#94A3B8", fontSize: 10 };
+const TOOLTIP_STYLE = { background: "#0D0E15", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12 };
+const TOOLTIP_LABEL = { color: "#00F0FF" };
+const TOOLTIP_CURSOR = { fill: "rgba(255,255,255,0.04)" };
+const LEGEND_STYLE = { fontSize: 11, color: "#94A3B8" };
+const BAR_RADIUS = [5, 5, 0, 0];
 
 const shiftDay = (isoDay, back) => {
   const d = new Date(`${isoDay}T00:00:00Z`);
@@ -112,17 +118,17 @@ export function SalesOverview() {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={view.chart} barGap={2}>
               <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis dataKey="day" tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={false} tickLine={false} width={metric === "revenue" ? 62 : 34} tickFormatter={(v) => (metric === "revenue" ? `${Math.round(v / 1000)}k` : v)} />
+              <XAxis dataKey="day" tick={AXIS_TICK} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={metric === "revenue" ? 62 : 34} tickFormatter={(v) => (metric === "revenue" ? `${Math.round(v / 1000)}k` : v)} />
               <Tooltip
                 formatter={(v, name) => [fmt(v), name]}
-                contentStyle={{ background: "#0D0E15", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12 }}
-                labelStyle={{ color: "#00F0FF" }}
-                cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={TOOLTIP_LABEL}
+                cursor={TOOLTIP_CURSOR}
               />
-              {cat === "all" && <Legend wrapperStyle={{ fontSize: 11, color: "#94A3B8" }} />}
+              {cat === "all" && <Legend wrapperStyle={LEGEND_STYLE} />}
               {bars.map((key) => (
-                <Bar key={key} dataKey={key} name={key === "vip" ? "VIP" : "Standard"} fill={COLOR[key]} radius={[5, 5, 0, 0]} maxBarSize={46} />
+                <Bar key={key} dataKey={key} name={key === "vip" ? "VIP" : "Standard"} fill={COLOR[key]} radius={BAR_RADIUS} maxBarSize={46} />
               ))}
             </BarChart>
           </ResponsiveContainer>

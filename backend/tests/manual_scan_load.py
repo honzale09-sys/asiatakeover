@@ -1,5 +1,4 @@
 """Scanner load test: 1000 lookups + 1000 checkins with concurrency, plus atomicity race check."""
-import json
 import os
 import statistics
 import threading

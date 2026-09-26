@@ -5,6 +5,7 @@ import { trackEvent } from "@/lib/tracking";
 import { useT } from "@/i18n";
 
 const FINAL_FAIL = new Set(["failed", "cancelled", "timeouted"]);
+const FAIL_COPY = { cancelled: "success.cancelled", timeouted: "success.expired" };
 
 export default function Success() {
   const [params] = useSearchParams();
@@ -123,7 +124,7 @@ export default function Success() {
           <div data-testid="success-failed">
             <h1 className="font-display font-extrabold text-2xl uppercase mb-2 text-[#FF0055]">{t("success.notCompleted")}</h1>
             <p className="text-slate-400 text-sm mb-6">
-              {ps === "cancelled" ? t("success.cancelled") : ps === "timeouted" ? t("success.expired") : t("success.failed")}{" "}
+              {t(FAIL_COPY[ps] || "success.failed")}{" "}
               {t("success.noCharge")}
             </p>
             <Link

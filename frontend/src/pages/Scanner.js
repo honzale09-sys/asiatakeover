@@ -78,7 +78,8 @@ function useCamera(onCode) {
 const logNote = (screen) => {
   if (screen.kind === "declined") return screen.reason;
   if (screen.kind === "offline") return "NO CONNECTION";
-  return screen.kind === "vip" ? (screen.gift ? "VIP + GIFT" : "VIP · NO GIFT") : "STANDARD";
+  if (screen.kind !== "vip") return "STANDARD";
+  return screen.gift ? "VIP + GIFT" : "VIP · NO GIFT";
 };
 
 export default function Scanner() {

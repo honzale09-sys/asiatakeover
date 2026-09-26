@@ -1,7 +1,6 @@
 """Tests for new admin endpoints: GET /admin/sales-overview and full /admin/promo-codes CRUD.
 Also validates promo checkout behaviour (percent, amount_off_czk, max_uses, inactive)."""
 import os
-import time
 import uuid
 import requests
 import pytest

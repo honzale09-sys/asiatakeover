@@ -3,6 +3,11 @@ import { Link } from "react-router-dom";
 import { useT } from "@/i18n";
 
 const ease = [0.16, 1, 0.3, 1];
+const FADE_IN = { initial: { opacity: 0 }, animate: { opacity: 1 } };
+const RISE_IN = { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 } };
+const LOGOS_T = { delay: 0.3, duration: 1, ease };
+const TITLE_T = { delay: 0.5, duration: 1.1, ease };
+const META_T = { delay: 0.9, duration: 0.9, ease };
 
 export default function Hero({ event, tiers = [] }) {
   const { t, lp } = useT();
@@ -44,9 +49,8 @@ export default function Hero({ event, tiers = [] }) {
 
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-5">
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3, duration: 1, ease }}
+          {...FADE_IN}
+          transition={LOGOS_T}
           className="flex items-center justify-center gap-5 sm:gap-8 mb-6 sm:mb-8"
           data-testid="hero-partner-logos"
         >
@@ -65,16 +69,14 @@ export default function Hero({ event, tiers = [] }) {
           src="/assets/logo-atf.png"
           alt="ASIA TAKEOVER FESTIVAL"
           data-testid="hero-logo"
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 1.1, ease }}
+          {...RISE_IN}
+          transition={TITLE_T}
           className="w-[74vw] max-w-[560px] object-contain drop-shadow-[0_0_45px_rgba(255,20,80,0.3)]"
         />
 
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.9, duration: 0.9, ease }}
+          {...FADE_IN}
+          transition={META_T}
           className="mt-6 sm:mt-8 flex flex-col items-center text-center"
         >
           <p className="font-mono2 text-xs sm:text-sm tracking-[0.3em] uppercase text-white/85" data-testid="hero-date">
