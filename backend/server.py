@@ -2089,6 +2089,17 @@ async def admin_test_tickets_all(admin=Depends(get_current_admin)):
     return [await create_test_ticket(kind, admin) for kind in TEST_KINDS]
 
 
+@api_router.post("/admin/test-tickets/reset")
+async def admin_test_tickets_reset(admin=Depends(get_current_admin)):
+    """Mark every test ticket valid again so the same QR codes can be rehearsed over and over.
+    Touches only the test collection — real tickets and check-ins are never affected."""
+    r = await db.test_tickets.update_many(
+        {}, {"$set": {"status": "valid", "checked_in_at": None, "checked_in_by": None}}
+    )
+    logger.warning("ADMIN %s reset %d test ticket(s)", admin.get("email"), r.modified_count)
+    return {"ok": True, "reset": r.modified_count}
+
+
 @api_router.delete("/admin/test-tickets")
 async def admin_test_tickets_delete(admin=Depends(get_current_admin)):
     n = (await db.test_tickets.delete_many({})).deleted_count

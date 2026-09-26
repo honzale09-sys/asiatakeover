@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
-import { toast } from "sonner";
 import { api } from "@/api";
 import AdminLogin from "@/components/AdminLogin";
 import { ScanResultScreen } from "@/components/scanner/ScanResultPanel";
 import { CameraPanel, DoorLog, LastResultStrip, Legend } from "@/components/scanner/ScannerPanels";
-import { beep, screenFor } from "@/components/scanner/scanUtils";
+import { admittedScreen, screenFor } from "@/components/scanner/scanUtils";
+import { feedback, unlockAudio } from "@/components/scanner/feedback";
+import { useQrScanner } from "@/components/scanner/useQrScanner";
+import { usePwaShell } from "@/components/scanner/usePwaShell";
 
-// Session check with one silent refresh — keeps the scanner logged in through long events.
+const SAME_CODE_COOLDOWN_MS = 6000;
+const SCAN_TIMEOUT_MS = 8000; // bad venue Wi-Fi must fail fast into CONNECTION ERROR, never hang
+const AUTO_DISMISS = { admitted: 3000, declined: 6000 };
+
 function useScannerSession() {
   const [user, setUser] = useState(null);
   useEffect(() => {
@@ -28,8 +32,8 @@ function useScannerSession() {
   return [user, setUser];
 }
 
-// Refresh the session once on 401 so door staff never get logged out mid-scan,
-// and retry once on transient failures (edge 429 / 5xx / network hiccup) before declining.
+// Refresh the session once on 401 so door staff are never logged out mid-scan, and retry once on a
+// transient failure (edge 429 / 5xx / network hiccup) before declining the ticket.
 async function withRefresh(fn) {
   try {
     return await fn();
@@ -39,43 +43,15 @@ async function withRefresh(fn) {
       return await fn();
     }
     if (!e?.response || e.response.status === 429 || e.response.status >= 500) {
-      await new Promise((r) => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 1000));
       return await fn();
     }
     throw e;
   }
 }
 
-function useCamera(onCode) {
-  const [cameraOn, setCameraOn] = useState(false);
-  const scannerRef = useRef(null);
-  useEffect(() => () => {
-    scannerRef.current?.stop().catch((e) => console.warn("Scanner: camera stop on unmount failed", e));
-  }, []);
-  const start = async () => {
-    try {
-      const s = new Html5Qrcode("qr-reader");
-      scannerRef.current = s;
-      await s.start({ facingMode: "environment" }, { fps: 8, qrbox: { width: 240, height: 240 } }, (text) => onCode(text, true), () => {});
-      setCameraOn(true);
-    } catch (e) {
-      console.warn("Scanner: camera start failed", e);
-      toast.error("Camera unavailable on this device — use manual code entry below.");
-    }
-  };
-  const stop = async () => {
-    try {
-      await scannerRef.current?.stop();
-    } catch (e) {
-      console.warn("Scanner: camera stop failed", e);
-    }
-    scannerRef.current = null;
-    setCameraOn(false);
-  };
-  return { cameraOn, toggle: cameraOn ? stop : start };
-}
-
 const logNote = (screen) => {
+  if (screen.kind === "used") return "ALREADY USED";
   if (screen.kind === "declined") return screen.reason;
   if (screen.kind === "offline") return "NO CONNECTION";
   if (screen.kind !== "vip") return "STANDARD";
@@ -88,56 +64,68 @@ export default function Scanner() {
   const [screen, setScreen] = useState(null);
   const [log, setLog] = useState([]);
   const [stats, setStats] = useState({ admitted: 0, declined: 0 });
-  const processingRef = useRef(false);
+  const busyRef = useRef(false);
   const lastRef = useRef({ code: "", at: 0 });
+  usePwaShell();
 
-  // One scan = one atomic server check-in. No second confirmation tap, no offline admits.
+  const pushLog = useCallback((entry) => {
+    setLog((l) => [{ id: `${Date.now()}-${l.length}`, at: new Date().toLocaleTimeString("cs-CZ"), ...entry }, ...l].slice(0, 20));
+  }, []);
+
+  // One scan = one atomic server check-in. No confirmation tap, no offline admits.
   const handleCode = useCallback(async (raw, fromCamera = false) => {
-    if (processingRef.current || !raw) return;
+    if (busyRef.current || !raw) return;
     const clean = raw.trim().toUpperCase();
-    // the camera keeps decoding the same QR while it stays in frame — ignore it for a few seconds
-    if (fromCamera && clean === lastRef.current.code && Date.now() - lastRef.current.at < 8000) return;
-    processingRef.current = true;
+    // the camera keeps decoding the same QR while it stays in frame
+    if (fromCamera && clean === lastRef.current.code && Date.now() - lastRef.current.at < SAME_CODE_COOLDOWN_MS) return;
+    busyRef.current = true;
     lastRef.current = { code: clean, at: Date.now() };
     try {
-      const r = await withRefresh(() => api.post("/scan/checkin", { code: clean }));
+      const r = await withRefresh(() => api.post("/scan/checkin", { code: clean }, { timeout: SCAN_TIMEOUT_MS }));
       const next = screenFor(r.data);
-      const admitted = next.kind !== "declined";
+      const admitted = admittedScreen(next);
       setScreen(next);
-      beep(admitted);
+      feedback(admitted);
       setStats((s) => ({ admitted: s.admitted + (admitted ? 1 : 0), declined: s.declined + (admitted ? 0 : 1) }));
-      setLog((l) => [{
-        id: `${Date.now()}-${l.length}`, code: next.code || clean,
-        result: admitted ? "admitted" : "declined", note: logNote(next),
-        at: new Date().toLocaleTimeString("cs-CZ"),
-      }, ...l].slice(0, 15));
+      pushLog({ code: next.code || clean, result: admitted ? "admitted" : "declined", note: logNote(next) });
       setCode("");
     } catch (e) {
       if (e?.response?.status === 401) {
         setUser(false);
       } else {
         setScreen({ kind: "offline" });
-        beep(false);
+        feedback(false);
         setStats((s) => ({ ...s, declined: s.declined + 1 }));
-        setLog((l) => [{
-          id: `${Date.now()}-${l.length}`, code: clean, result: "error", note: "NO CONNECTION",
-          at: new Date().toLocaleTimeString("cs-CZ"),
-        }, ...l].slice(0, 15));
+        pushLog({ code: clean, result: "error", note: "NO CONNECTION" });
       }
     } finally {
-      setTimeout(() => {
-        processingRef.current = false;
-      }, 1200);
+      setTimeout(() => { busyRef.current = false; }, 900);
     }
-  }, [setUser]);
+  }, [pushLog, setUser]);
 
-  const { cameraOn, toggle } = useCamera(handleCode);
+  const { readerId, cameraOn, starting, error, start, stop, restart } = useQrScanner(handleCode);
+
+  const scanNext = useCallback(() => {
+    busyRef.current = false;
+    lastRef.current = { code: "", at: 0 };
+    setScreen(null);
+  }, []);
 
   useEffect(() => {
     if (!screen) return undefined;
-    const timer = setTimeout(() => setScreen(null), screen.kind === "declined" || screen.kind === "offline" ? 6000 : 3500);
+    const ms = admittedScreen(screen) ? AUTO_DISMISS.admitted : AUTO_DISMISS.declined;
+    const timer = setTimeout(scanNext, ms);
     return () => clearTimeout(timer);
-  }, [screen]);
+  }, [screen, scanNext]);
+
+  const toggleCamera = () => {
+    if (cameraOn) {
+      stop();
+      return;
+    }
+    unlockAudio(); // iOS only allows the beep after a user gesture
+    start();
+  };
 
   const logout = async () => {
     await api.post("/auth/logout").catch((e) => console.warn("Scanner: logout request failed", e));
@@ -151,8 +139,8 @@ export default function Scanner() {
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-[#060609] text-white" data-testid="scanner-page">
-      <ScanResultScreen screen={screen} onDismiss={() => { processingRef.current = false; setScreen(null); }} />
-      <header className="glass border-b border-white/10 shrink-0">
+      <ScanResultScreen screen={screen} onNext={scanNext} />
+      <header className="glass border-b border-white/10 shrink-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="px-3 sm:px-8 h-12 sm:h-16 flex items-center justify-between gap-3">
           <p className="font-display font-black uppercase text-xs sm:text-base truncate">
             Door Control <span className="text-[#FF0055]">✦</span> <span className="hidden sm:inline text-[#00F0FF]">Našcanuj to, bráško</span>
@@ -168,8 +156,21 @@ export default function Scanner() {
         </div>
       </header>
 
-      <div className="flex-1 min-h-0 w-full max-w-5xl mx-auto px-3 sm:px-8 py-3 sm:py-6 grid grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-2 gap-3 sm:gap-6">
-        <CameraPanel cameraOn={cameraOn} onToggleCamera={toggle} code={code} setCode={setCode} onCheck={() => handleCode(code)} />
+      <div
+        className="flex-1 min-h-0 w-full max-w-5xl mx-auto px-3 sm:px-8 py-3 sm:py-6 grid grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-2 gap-3 sm:gap-6"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        <CameraPanel
+          readerId={readerId}
+          cameraOn={cameraOn}
+          starting={starting}
+          error={error}
+          onToggle={toggleCamera}
+          onRestart={restart}
+          code={code}
+          setCode={setCode}
+          onCheck={() => handleCode(code)}
+        />
         <div className="flex flex-col gap-3 min-h-0">
           <LastResultStrip last={log[0]} />
           <Legend />

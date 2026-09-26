@@ -1,34 +1,46 @@
-import { Camera, ScanLine } from "lucide-react";
+import { Camera, RotateCcw, ScanLine } from "lucide-react";
 import { logResultCls } from "./scanUtils";
 
 const inputCls =
-  "w-full bg-[#0D0E15] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:border-[#FF0055] outline-none transition-colors";
+  "w-full bg-[#0D0E15] border border-white/10 rounded-lg px-3 py-2.5 text-base text-white focus:border-[#FF0055] outline-none transition-colors";
 
-export function CameraPanel({ cameraOn, onToggleCamera, code, setCode, onCheck }) {
+export function CameraPanel({ readerId, cameraOn, starting, error, onToggle, onRestart, code, setCode, onCheck }) {
   return (
-    <div className="flex flex-col gap-3 min-h-0">
+    <div className="flex flex-col gap-2.5 min-h-0">
       <div
-        className="relative border-2 border-dashed border-white/15 rounded-2xl overflow-hidden bg-[#0D0E15] h-[30vh] min-h-[170px] sm:h-[300px] lg:h-[340px] flex items-center justify-center"
+        className="relative border-2 border-dashed border-white/15 rounded-2xl overflow-hidden bg-[#0D0E15] h-[32vh] min-h-[180px] sm:h-[300px] lg:h-[340px] flex items-center justify-center"
         data-testid="camera-viewport"
       >
-        <div id="qr-reader" className="w-full h-full" />
+        <div id={readerId} className="w-full h-full" />
         {cameraOn && <div className="absolute inset-x-6 h-0.5 bg-[#FF0055] scan-laser neon-shadow pointer-events-none" />}
         {!cameraOn && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none">
-            <ScanLine size={28} className="text-slate-600" />
-            <p className="font-mono2 text-[10px] text-slate-500 uppercase tracking-[0.25em]">Camera off</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none px-4 text-center">
+            <ScanLine size={26} className="text-slate-600" />
+            <p className="font-mono2 text-[10px] text-slate-500 uppercase tracking-[0.25em]">
+              {starting ? "Starting camera…" : "Camera off"}
+            </p>
+            {error && <p className="font-mono2 text-[10px] text-[#FF6A00] max-w-xs" data-testid="camera-error">{error}</p>}
           </div>
         )}
       </div>
-      <button
-        onClick={onToggleCamera}
-        data-testid="camera-start-button"
-        className={`w-full flex items-center justify-center gap-2 font-display font-bold uppercase text-xs sm:text-sm py-3 rounded-full transition-colors duration-300 ${
-          cameraOn ? "border border-white/20 hover:border-[#FF0055] hover:text-[#FF0055]" : "bg-[#00F0FF] text-black hover:bg-[#FFE600] cyan-shadow"
-        }`}
-      >
-        <Camera size={15} /> {cameraOn ? "Stop camera" : "Start camera scan"}
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={onToggle}
+          data-testid="camera-start-button"
+          className={`flex-1 flex items-center justify-center gap-2 font-display font-bold uppercase text-xs sm:text-sm py-3 rounded-full transition-colors duration-300 ${
+            cameraOn ? "border border-white/20 hover:border-[#FF0055] hover:text-[#FF0055]" : "bg-[#00F0FF] text-black hover:bg-[#FFE600] cyan-shadow"
+          }`}
+        >
+          <Camera size={15} /> {cameraOn ? "Stop camera" : "Start camera scan"}
+        </button>
+        <button
+          onClick={onRestart}
+          data-testid="camera-restart-button"
+          className="shrink-0 flex items-center gap-2 border border-white/20 hover:border-[#00F0FF] hover:text-[#00F0FF] font-display font-bold uppercase text-xs sm:text-sm px-4 rounded-full transition-colors duration-300"
+        >
+          <RotateCcw size={14} /> Restart
+        </button>
+      </div>
       <div className="flex gap-2">
         <input
           data-testid="qr-code-input"
@@ -37,6 +49,8 @@ export function CameraPanel({ cameraOn, onToggleCamera, code, setCode, onCheck }
           value={code}
           onChange={(e) => setCode(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onCheck()}
+          autoComplete="off"
+          autoCapitalize="characters"
         />
         <button
           onClick={onCheck}
@@ -61,15 +75,13 @@ export function LastResultStrip({ last }) {
   if (!last)
     return (
       <div className="border border-white/10 rounded-2xl bg-[#0D0E15] px-4 py-3 text-center" data-testid="last-result">
-        <p className="font-mono2 text-[10px] uppercase tracking-[0.25em] text-slate-500">Waiting for first scan</p>
+        <p className="font-mono2 text-[10px] uppercase tracking-[0.25em] text-slate-500">Point the camera at a ticket QR</p>
       </div>
     );
   return (
     <div className={`border rounded-2xl px-4 py-3 ${STRIP[last.result]}`} data-testid="last-result">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="font-display font-black uppercase text-lg sm:text-2xl leading-none truncate">
-          {STRIP_TITLE[last.result]}
-        </p>
+        <p className="font-display font-black uppercase text-lg sm:text-2xl leading-none truncate">{STRIP_TITLE[last.result]}</p>
         <p className="font-mono2 text-[10px] text-slate-400 shrink-0">{last.at}</p>
       </div>
       <p className="font-mono2 text-xs mt-1.5 truncate">{last.note} · {last.code}</p>

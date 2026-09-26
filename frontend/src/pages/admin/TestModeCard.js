@@ -53,6 +53,7 @@ export function TestModeCard() {
     }
   };
   const generateAll = () => run(() => api.post("/admin/test-tickets/generate-all"), "6 test tickets generated");
+  const resetAll = () => run(() => api.post("/admin/test-tickets/reset"), "Test tickets valid again");
   const wipe = () => {
     if (!window.confirm("Delete all test tickets? Real tickets, orders and QR codes stay untouched.")) return;
     run(() => api.delete("/admin/test-tickets"), "Test data deleted");
@@ -69,6 +70,9 @@ export function TestModeCard() {
         <div className="flex gap-2">
           <button onClick={generateAll} disabled={busy} className={`${actBtn} disabled:opacity-50`} data-testid="test-generate-all">
             {busy ? "Working…" : "Generate all test tickets"}
+          </button>
+          <button onClick={resetAll} disabled={busy || list.length === 0} className={`${actBtn} disabled:opacity-40`} data-testid="test-reset-all">
+            Reset to valid
           </button>
           <button onClick={wipe} disabled={busy || list.length === 0} className={`${actBtn} disabled:opacity-40`} data-testid="test-delete-all">
             <Trash2 size={12} className="inline mr-1" />Delete test data
