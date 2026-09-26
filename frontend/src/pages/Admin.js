@@ -27,7 +27,9 @@ export default function Admin() {
   const [tab, setTab] = useState("overview");
 
   useEffect(() => {
-    api.get("/auth/me").then((r) => setUser(r.data)).catch(() => setUser(false));
+    api.get("/auth/me")
+      .then((r) => setUser(r.data.role === "door" ? false : r.data)) // door staff have no back-office access
+      .catch(() => setUser(false));
   }, []);
 
   if (user === null)

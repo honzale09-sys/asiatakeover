@@ -4,14 +4,21 @@ import { logResultCls } from "./scanUtils";
 const inputCls =
   "w-full bg-[#0D0E15] border border-white/10 rounded-lg px-3 py-2.5 text-base text-white focus:border-[#FF0055] outline-none transition-colors";
 
-export function CameraPanel({ readerId, cameraOn, starting, error, onToggle, onRestart, code, setCode, onCheck }) {
+export function CameraPanel({ videoRef, cameraOn, starting, error, onToggle, onRestart, code, setCode, onCheck }) {
   return (
     <div className="flex flex-col gap-2.5 min-h-0">
       <div
         className="relative border-2 border-dashed border-white/15 rounded-2xl overflow-hidden bg-[#0D0E15] h-[32vh] min-h-[180px] sm:h-[300px] lg:h-[340px] flex items-center justify-center"
         data-testid="camera-viewport"
       >
-        <div id={readerId} className="w-full h-full" />
+        <video
+          ref={videoRef}
+          className={`w-full h-full object-cover ${cameraOn ? "" : "opacity-0"}`}
+          playsInline
+          autoPlay
+          muted
+          data-testid="camera-video"
+        />
         {cameraOn && <div className="absolute inset-x-6 h-0.5 bg-[#FF0055] scan-laser neon-shadow pointer-events-none" />}
         {!cameraOn && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none px-4 text-center">

@@ -3,14 +3,13 @@ import { api } from "@/api";
 import AdminLogin from "@/components/AdminLogin";
 import { ScanResultScreen } from "@/components/scanner/ScanResultPanel";
 import { CameraPanel, DoorLog, LastResultStrip, Legend } from "@/components/scanner/ScannerPanels";
+import { ScannerDiagnostics } from "@/components/scanner/ScannerDiagnostics";
 import { admittedScreen, screenFor } from "@/components/scanner/scanUtils";
 import { feedback, unlockAudio } from "@/components/scanner/feedback";
 import { useQrScanner } from "@/components/scanner/useQrScanner";
 import { usePwaShell } from "@/components/scanner/usePwaShell";
 
-const SAME_CODE_COOLDOWN_MS = 6000;
 const SCAN_TIMEOUT_MS = 8000; // bad venue Wi-Fi must fail fast into CONNECTION ERROR, never hang
-const AUTO_DISMISS = { admitted: 3000, declined: 6000 };
 
 function useScannerSession() {
   const [user, setUser] = useState(null);
@@ -64,32 +63,35 @@ export default function Scanner() {
   const [screen, setScreen] = useState(null);
   const [log, setLog] = useState([]);
   const [stats, setStats] = useState({ admitted: 0, declined: 0 });
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [lastResponse, setLastResponse] = useState("");
   const busyRef = useRef(false);
-  const lastRef = useRef({ code: "", at: 0 });
+  const scannerRef = useRef(null);
   usePwaShell();
 
   const pushLog = useCallback((entry) => {
     setLog((l) => [{ id: `${Date.now()}-${l.length}`, at: new Date().toLocaleTimeString("cs-CZ"), ...entry }, ...l].slice(0, 20));
   }, []);
 
-  // One scan = one atomic server check-in. No confirmation tap, no offline admits.
-  const handleCode = useCallback(async (raw, fromCamera = false) => {
+  // One detected QR = exactly one atomic server check-in. The camera layer is already locked when
+  // this runs (it pauses on detection); busyRef additionally guards manual entry double taps.
+  const handleCode = useCallback(async (raw) => {
     if (busyRef.current || !raw) return;
     const clean = raw.trim().toUpperCase();
-    // the camera keeps decoding the same QR while it stays in frame
-    if (fromCamera && clean === lastRef.current.code && Date.now() - lastRef.current.at < SAME_CODE_COOLDOWN_MS) return;
     busyRef.current = true;
-    lastRef.current = { code: clean, at: Date.now() };
+    scannerRef.current?.pause();
     try {
       const r = await withRefresh(() => api.post("/scan/checkin", { code: clean }, { timeout: SCAN_TIMEOUT_MS }));
       const next = screenFor(r.data);
       const admitted = admittedScreen(next);
       setScreen(next);
+      setLastResponse(`${clean} → ${r.data.result}${r.data.reason ? ` / ${r.data.reason}` : ""}${r.data.admission ? ` / ${r.data.admission.wristband}${r.data.admission.gift ? "+gift" : ""}` : ""}`);
       feedback(admitted);
       setStats((s) => ({ admitted: s.admitted + (admitted ? 1 : 0), declined: s.declined + (admitted ? 0 : 1) }));
       pushLog({ code: next.code || clean, result: admitted ? "admitted" : "declined", note: logNote(next) });
       setCode("");
     } catch (e) {
+      setLastResponse(`${clean} → ERROR ${e?.response?.status || ""} ${e?.message || ""}`.trim());
       if (e?.response?.status === 401) {
         setUser(false);
       } else {
@@ -99,24 +101,20 @@ export default function Scanner() {
         pushLog({ code: clean, result: "error", note: "NO CONNECTION" });
       }
     } finally {
-      setTimeout(() => { busyRef.current = false; }, 900);
+      busyRef.current = false;
     }
   }, [pushLog, setUser]);
 
-  const { readerId, cameraOn, starting, error, start, stop, restart } = useQrScanner(handleCode);
+  const scanner = useQrScanner(handleCode);
+  scannerRef.current = scanner;
+  const { videoRef, cameraOn, starting, error, diag, start, stop, restart, resume } = scanner;
 
+  // SCAN NEXT is the only way back to scanning — the result stays on screen until staff confirm it.
   const scanNext = useCallback(() => {
     busyRef.current = false;
-    lastRef.current = { code: "", at: 0 };
     setScreen(null);
-  }, []);
-
-  useEffect(() => {
-    if (!screen) return undefined;
-    const ms = admittedScreen(screen) ? AUTO_DISMISS.admitted : AUTO_DISMISS.declined;
-    const timer = setTimeout(scanNext, ms);
-    return () => clearTimeout(timer);
-  }, [screen, scanNext]);
+    resume();
+  }, [resume]);
 
   const toggleCamera = () => {
     if (cameraOn) {
@@ -135,11 +133,21 @@ export default function Scanner() {
   if (user === null)
     return <div className="min-h-screen bg-[#060609] flex items-center justify-center font-mono2 text-xs text-slate-500 uppercase tracking-[0.3em]">Loading…</div>;
   if (user === false)
-    return <AdminLogin title="Door Control" subtitle="Našcanuj to, bráško — sign in to validate tickets" onLogin={setUser} testPrefix="scanner" />;
+    return (
+      <AdminLogin
+        title="Door Control"
+        subtitle="Našcanuj to, bráško — sign in to validate tickets"
+        onLogin={setUser}
+        testPrefix="scanner"
+        identifierType="text"
+        identifierLabel="Username"
+      />
+    );
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-[#060609] text-white" data-testid="scanner-page">
       <ScanResultScreen screen={screen} onNext={scanNext} />
+      {diagOpen && <ScannerDiagnostics diag={diag} lastResponse={lastResponse} onClose={() => setDiagOpen(false)} />}
       <header className="glass border-b border-white/10 shrink-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="px-3 sm:px-8 h-12 sm:h-16 flex items-center justify-between gap-3">
           <p className="font-display font-black uppercase text-xs sm:text-base truncate">
@@ -149,6 +157,9 @@ export default function Scanner() {
             <span data-testid="scanner-stats">
               <span className="text-emerald-400">{stats.admitted}</span> in · <span className="text-[#FF0055]">{stats.declined}</span> out
             </span>
+            <button onClick={() => setDiagOpen(true)} data-testid="diag-open-button" className="hover:text-[#00F0FF] transition-colors uppercase tracking-wider">
+              Diag
+            </button>
             <button onClick={logout} data-testid="scanner-logout-button" className="hover:text-[#FF0055] transition-colors uppercase tracking-wider">
               Logout
             </button>
@@ -161,7 +172,7 @@ export default function Scanner() {
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <CameraPanel
-          readerId={readerId}
+          videoRef={videoRef}
           cameraOn={cameraOn}
           starting={starting}
           error={error}

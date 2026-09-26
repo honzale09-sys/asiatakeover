@@ -84,7 +84,7 @@ def set_auth_cookies(response: Response, access: str, refresh: str):
                         samesite="none", max_age=604800, path="/")
 
 
-async def get_current_admin(request: Request):
+async def get_current_user(request: Request):
     token = request.cookies.get("access_token")
     auth = request.headers.get("Authorization", "")
     if not token and auth.startswith("Bearer "):
@@ -105,14 +105,31 @@ async def get_current_admin(request: Request):
     return user
 
 
+async def get_current_admin(request: Request):
+    """Full back-office access. Door staff (role 'door') are rejected on purpose."""
+    user = await get_current_user(request)
+    if user.get("role", "admin") != "admin":
+        raise HTTPException(403, "Admin access required")
+    return user
+
+
+async def get_current_staff(request: Request):
+    """Door duty: admins and door staff may validate tickets, nothing else."""
+    user = await get_current_user(request)
+    if user.get("role", "admin") not in ("admin", "door"):
+        raise HTTPException(403, "Door access required")
+    return user
+
+
 class LoginIn(BaseModel):
-    email: EmailStr
+    # username OR email — the door staff account signs in with a plain username
+    email: str = Field(min_length=3, max_length=120)
     password: str
 
 
 @api_router.post("/auth/login")
 async def login(data: LoginIn, request: Request, response: Response):
-    email = data.email.lower()
+    email = data.email.strip().lower()
     ip = request.client.host if request.client else "unknown"
     identifier = f"{ip}:{email}"
     attempt = await db.login_attempts.find_one({"identifier": identifier})
@@ -129,7 +146,7 @@ async def login(data: LoginIn, request: Request, response: Response):
              "$set": {"locked_until": (utcnow() + timedelta(minutes=15)).isoformat()}},
             upsert=True,
         )
-        raise HTTPException(401, "Invalid email or password")
+        raise HTTPException(401, "Invalid username or password")
     await db.login_attempts.delete_one({"identifier": identifier})
     set_auth_cookies(response, create_access_token(user["id"], email), create_refresh_token(user["id"]))
     return {"id": user["id"], "email": email, "name": user.get("name", "Admin"),
@@ -164,8 +181,8 @@ async def refresh_tokens(request: Request, response: Response):
 
 
 @api_router.get("/auth/me")
-async def me(admin=Depends(get_current_admin)):
-    return admin
+async def me(user=Depends(get_current_staff)):
+    return user
 
 
 # ---------------- public site ----------------
@@ -1811,7 +1828,7 @@ def decline_reason(order_status: str) -> str:
 
 
 @api_router.post("/scan/lookup")
-async def scan_lookup(data: ScanIn, admin=Depends(get_current_admin)):
+async def scan_lookup(data: ScanIn, admin=Depends(get_current_staff)):
     t = await find_ticket(data.code)
     if not t:
         tt = await db.test_tickets.find_one({"code": normalize_code(data.code)}, {"_id": 0})
@@ -1830,7 +1847,7 @@ async def scan_lookup(data: ScanIn, admin=Depends(get_current_admin)):
 
 
 @api_router.post("/scan/checkin")
-async def scan_checkin(data: ScanIn, admin=Depends(get_current_admin)):
+async def scan_checkin(data: ScanIn, admin=Depends(get_current_staff)):
     code = normalize_code(data.code)
     ts = utcnow().isoformat()
     t = await db.tickets.find_one_and_update(
@@ -2539,6 +2556,32 @@ async def seed_admin():
         logger.info("Admin password updated from env")
 
 
+async def seed_door_staff():
+    """Door-only login (role 'door'): can validate tickets, cannot open the back office."""
+    username = (os.environ.get("DOOR_USERNAME") or "").strip().lower()
+    password = os.environ.get("DOOR_PASSWORD") or ""
+    if not username or not password:
+        return
+    existing = await db.users.find_one({"email": username})
+    if existing is None:
+        await db.users.insert_one({
+            "id": new_id(), "email": username,
+            "password_hash": hash_password(password),
+            "name": os.environ.get("DOOR_USERNAME", "Door Staff").strip(), "role": "door",
+            "created_at": utcnow().isoformat(),
+        })
+        logger.info("Door staff user seeded: %s", username)
+        return
+    updates = {}
+    if not verify_password(password, existing["password_hash"]):
+        updates["password_hash"] = hash_password(password)
+    if existing.get("role") != "door":
+        updates["role"] = "door"
+    if updates:
+        await db.users.update_one({"email": username}, {"$set": updates})
+        logger.info("Door staff credentials updated from env")
+
+
 async def seed_event():
     if await db.events.count_documents({}) == 0:
         event = {
@@ -2588,6 +2631,7 @@ async def startup():
         upsert=True,
     )
     await seed_admin()
+    await seed_door_staff()
     await seed_event()
     asyncio.create_task(retry_unsent_ticket_emails())
     asyncio.create_task(teya_reconcile_sweep())

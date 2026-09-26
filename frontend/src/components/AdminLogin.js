@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, formatError } from "@/api";
 
-export default function AdminLogin({ title, subtitle, onLogin, testPrefix = "admin" }) {
+export default function AdminLogin({ title, subtitle, onLogin, testPrefix = "admin", identifierType = "email", identifierLabel = "Email" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -37,10 +37,13 @@ export default function AdminLogin({ title, subtitle, onLogin, testPrefix = "adm
         <div className="space-y-4">
           <input
             data-testid={`${testPrefix}-email-input`}
-            type="email"
+            type={identifierType}
             required
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck="false"
             className={inputCls}
-            placeholder="Email"
+            placeholder={identifierLabel}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
