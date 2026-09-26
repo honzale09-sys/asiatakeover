@@ -2559,7 +2559,9 @@ async def startup():
 
 app.include_router(api_router)
 
-_origins = [o for o in [os.environ.get("FRONTEND_URL"), "http://localhost:3000"] if o]
+_env_origins = [o.strip() for o in (os.environ.get("CORS_ORIGINS") or "").split(",") if o.strip() and o.strip() != "*"]
+# cookie auth needs an explicit allowlist — "*" is not valid with credentials
+_origins = _env_origins or [o for o in [os.environ.get("FRONTEND_URL"), "http://localhost:3000"] if o]
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
