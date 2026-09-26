@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api } from "@/api";
 import AdminLogin from "@/components/AdminLogin";
 import { ScanResultScreen } from "@/components/scanner/ScanResultPanel";
-import { CameraPanel, DoorLog } from "@/components/scanner/ScannerPanels";
+import { CameraPanel, DoorLog, LastResultStrip, Legend } from "@/components/scanner/ScannerPanels";
 import { beep, screenFor } from "@/components/scanner/scanUtils";
 
 // Session check with one silent refresh — keeps the scanner logged in through long events.
@@ -149,15 +149,17 @@ export default function Scanner() {
     return <AdminLogin title="Door Control" subtitle="Našcanuj to, bráško — sign in to validate tickets" onLogin={setUser} testPrefix="scanner" />;
 
   return (
-    <div className="min-h-screen bg-[#060609] text-white" data-testid="scanner-page">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-[#060609] text-white" data-testid="scanner-page">
       <ScanResultScreen screen={screen} onDismiss={() => { processingRef.current = false; setScreen(null); }} />
-      <header className="glass border-b border-white/10 sticky top-0 z-40">
-        <div className="px-4 sm:px-8 h-16 flex items-center justify-between">
-          <p className="font-display font-black uppercase text-sm sm:text-base">
-            Door Control <span className="text-[#FF0055]">✦</span> <span className="text-[#00F0FF]">Našcanuj to, bráško</span>
+      <header className="glass border-b border-white/10 shrink-0">
+        <div className="px-3 sm:px-8 h-12 sm:h-16 flex items-center justify-between gap-3">
+          <p className="font-display font-black uppercase text-xs sm:text-base truncate">
+            Door Control <span className="text-[#FF0055]">✦</span> <span className="hidden sm:inline text-[#00F0FF]">Našcanuj to, bráško</span>
           </p>
-          <div className="flex items-center gap-4 font-mono2 text-xs text-slate-400">
-            <span data-testid="scanner-stats">admitted {stats.admitted} · declined {stats.declined}</span>
+          <div className="flex items-center gap-3 font-mono2 text-[10px] sm:text-xs text-slate-400 shrink-0">
+            <span data-testid="scanner-stats">
+              <span className="text-emerald-400">{stats.admitted}</span> in · <span className="text-[#FF0055]">{stats.declined}</span> out
+            </span>
             <button onClick={logout} data-testid="scanner-logout-button" className="hover:text-[#FF0055] transition-colors uppercase tracking-wider">
               Logout
             </button>
@@ -165,18 +167,11 @@ export default function Scanner() {
         </div>
       </header>
 
-      <div className="px-4 sm:px-8 py-8 max-w-5xl mx-auto grid lg:grid-cols-2 gap-8">
+      <div className="flex-1 min-h-0 w-full max-w-5xl mx-auto px-3 sm:px-8 py-3 sm:py-6 grid grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-2 gap-3 sm:gap-6">
         <CameraPanel cameraOn={cameraOn} onToggleCamera={toggle} code={code} setCode={setCode} onCheck={() => handleCode(code)} />
-        <div className="flex flex-col gap-6">
-          <div className="border border-white/10 rounded-2xl bg-[#0D0E15] p-6" data-testid="scanner-hint">
-            <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-slate-500 mb-3">Door rules</p>
-            <ul className="space-y-2 font-mono2 text-xs text-slate-400">
-              <li><span className="text-[#00F0FF] font-bold">STANDARD</span> — standard wristband, no gift</li>
-              <li><span className="text-[#FFD400] font-bold">VIP</span> — VIP wristband; gift only when the screen says SURPRISE GIFT</li>
-              <li><span className="text-[#FF0055] font-bold">DECLINED</span> — no wristband, no gift</li>
-              <li>Each QR works exactly once — a second scan is declined.</li>
-            </ul>
-          </div>
+        <div className="flex flex-col gap-3 min-h-0">
+          <LastResultStrip last={log[0]} />
+          <Legend />
           <DoorLog log={log} />
         </div>
       </div>
