@@ -57,9 +57,9 @@ export function DoorLog({ log }) {
       <p className="font-mono2 text-[11px] uppercase tracking-[0.25em] text-slate-500 mb-3">Door log</p>
       <div className="space-y-2 max-h-56 overflow-y-auto">
         {log.map((l, i) => (
-          <div key={l.id} className="flex items-center justify-between font-mono2 text-xs" data-testid={`scan-log-entry-${i}`}>
+          <div key={l.id} className="flex items-center justify-between gap-2 font-mono2 text-xs" data-testid={`scan-log-entry-${i}`}>
             <span className="text-slate-300">{l.code}</span>
-            <span className={logResultCls(l.result)}>{l.result.toUpperCase()}</span>
+            <span className={`${logResultCls(l.result)} truncate`}>{l.note || l.result.toUpperCase()}</span>
             <span className="text-slate-600">{l.at}</span>
           </div>
         ))}

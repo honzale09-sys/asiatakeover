@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api, formatError, czk } from "@/api";
 import { StatCard, cardCls } from "./shared";
-import { VipGuestListCard } from "./VipGuestListCard";
+import { GuestListCard } from "./GuestListCard";
+import { CheckinReportCard } from "./CheckinReportCard";
 import { SalesOverview } from "./SalesOverview";
 
 function CategoryCard({ label, color, data, testid }) {
@@ -57,11 +58,15 @@ export function OverviewTab() {
         <StatCard label="Checked In" value={stats.checked_in} testid="stat-checked-in" />
         <StatCard label="Orders" value={stats.orders} testid="stat-orders" />
       </div>
-      <div className="grid gap-4 lg:grid-cols-3" data-testid="category-cards">
+      <div className="grid gap-4 lg:grid-cols-2" data-testid="category-cards">
         <CategoryCard label="Standard" color="text-[#00F0FF]" data={stats.categories?.standard} testid="cat-standard" />
         <CategoryCard label="VIP" color="text-[#C9A227]" data={stats.categories?.vip} testid="cat-vip" />
-        <VipGuestListCard stats={stats} onSent={load} />
       </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <GuestListCard category="vip" stats={stats} onSent={load} />
+        <GuestListCard category="standard" stats={stats} onSent={load} />
+      </div>
+      <CheckinReportCard />
       {stats.revenue_check && <RevenueCheckCard stats={stats} />}
       <SalesOverview />
     </div>

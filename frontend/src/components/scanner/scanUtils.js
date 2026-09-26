@@ -14,27 +14,25 @@ export function beep(ok) {
   }
 }
 
-export function ticketFlags(tierName) {
-  const tn = (tierName || "").toUpperCase();
-  const isGuest = /GUEST\s*LIST/.test(tn);
-  const isGold = tn.includes("GOLD");
-  const isAmbVip = tn === "AMBASSADOR VIP";
+// One scan → one of four door screens: STANDARD / VIP (with or without gift) / DECLINED.
+export function screenFor(data) {
+  if (data.result === "valid") {
+    const vip = data.admission?.wristband === "vip";
+    return {
+      kind: vip ? "vip" : "standard",
+      gift: !!data.admission?.gift,
+      code: data.ticket?.code,
+      holder: data.ticket?.holder_name,
+    };
+  }
   return {
-    isGuest,
-    isGold,
-    isAmbVip,
-    isAmbStd: tn === "AMBASSADOR STANDARD",
-    isVip: tn.includes("VIP") && !isGuest && !isGold && !isAmbVip,
+    kind: "declined",
+    reason: data.reason || (data.result === "used" ? "ALREADY USED" : "INVALID"),
+    code: data.ticket?.code,
+    firstScan: data.ticket?.checked_in_at,
+    by: data.ticket?.checked_in_by,
   };
 }
 
-const PANEL_CLS = {
-  idle: "border-white/10 bg-[#0D0E15]",
-  valid: "border-emerald-400 bg-emerald-400/10 shadow-[0_0_40px_rgba(52,211,153,0.25)]",
-  admitted: "border-emerald-400 bg-emerald-400/10 shadow-[0_0_40px_rgba(52,211,153,0.25)]",
-  refunded: "border-[#FF6A00] bg-[#FF6A00]/10 shadow-[0_0_40px_rgba(255,106,0,0.25)]",
-};
-export const panelCls = (result) => PANEL_CLS[result || "idle"] || "border-[#FF0055] bg-[#FF0055]/10 neon-shadow";
-
-const LOG_CLS = { valid: "text-emerald-400", used: "text-[#FFE600]" };
-export const logResultCls = (result) => LOG_CLS[result] || "text-[#FF0055]";
+const LOG_CLS = { admitted: "text-emerald-400", declined: "text-[#FF0055]", error: "text-[#FF6A00]" };
+export const logResultCls = (result) => LOG_CLS[result] || "text-slate-400";

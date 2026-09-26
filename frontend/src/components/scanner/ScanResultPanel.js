@@ -1,102 +1,83 @@
-import { CheckCircle2, XCircle } from "lucide-react";
-import { TierBadges } from "./TierBadges";
-import { panelCls } from "./scanUtils";
+import { Check, X, WifiOff } from "lucide-react";
 
-function Heading({ Icon, color, text }) {
+const STYLE = {
+  standard: { bg: "#00E5FF", fg: "#00171C", title: "STANDARD" },
+  vip: { bg: "#FFD400", fg: "#1A1300", title: "VIP" },
+  declined: { bg: "#E10026", fg: "#FFFFFF", title: "DECLINED" },
+  offline: { bg: "#E10026", fg: "#FFFFFF", title: "CONNECTION ERROR" },
+};
+
+function GiftLine({ gift }) {
+  return gift ? (
+    <div className="flex items-center justify-center gap-3 rounded-full bg-black/85 px-6 py-3" data-testid="scan-gift-yes">
+      <Check size={34} strokeWidth={4} className="text-[#22FF88]" />
+      <span className="font-display font-black uppercase text-xl sm:text-3xl text-[#22FF88] tracking-wide">Surprise gift</span>
+    </div>
+  ) : (
+    <div className="flex items-center justify-center gap-3 rounded-full bg-black/85 px-6 py-3" data-testid="scan-gift-no">
+      <X size={34} strokeWidth={4} className="text-[#FF2D55]" />
+      <span className="font-display font-black uppercase text-xl sm:text-3xl text-[#FF2D55] tracking-wide">No surprise gift</span>
+    </div>
+  );
+}
+
+function DeclinedBody({ screen }) {
   return (
     <>
-      <Icon size={44} className={`${color} mb-4`} />
-      <p className={`font-display font-black text-3xl uppercase ${color} mb-3`}>{text}</p>
+      <p className="font-display font-black uppercase leading-none text-[16vw] sm:text-[110px]">DECLINED</p>
+      <p className="font-display font-black uppercase text-3xl sm:text-5xl mt-4 tracking-wide" data-testid="scan-declined-reason">
+        {screen.reason}
+      </p>
+      {screen.firstScan && (
+        <p className="font-mono2 text-sm sm:text-base mt-4" data-testid="scan-first-scan-time">
+          First scan {new Date(screen.firstScan).toLocaleString("cs-CZ")}
+          {screen.by ? ` · ${screen.by}` : ""}
+        </p>
+      )}
+      <p className="font-display font-black uppercase text-lg sm:text-2xl mt-8 border-4 border-white rounded-2xl px-6 py-3">
+        Do not give wristband or gift
+      </p>
     </>
   );
 }
 
-function ValidResult({ t, onCheckin }) {
-  return (
-    <div data-testid="scan-result-valid">
-      <Heading Icon={CheckCircle2} color="text-emerald-400" text="Valid Ticket" />
-      <p className="font-mono2 text-sm text-white">{t.code}</p>
-      <p className="text-slate-300 text-sm mt-1">{t.holder_name}</p>
-      <p className="font-mono2 text-xs text-[#00F0FF] mt-1 uppercase tracking-wider">{t.tier_name}</p>
-      <TierBadges tierName={t.tier_name} />
-      <button
-        onClick={onCheckin}
-        data-testid="checkin-button"
-        className="mt-6 w-full bg-emerald-400 text-black hover:bg-[#FFE600] font-display font-black uppercase text-base py-4 rounded-full transition-colors duration-300"
-      >
-        Admit — Check In
-      </button>
-    </div>
-  );
-}
+export function ScanResultScreen({ screen, onDismiss }) {
+  if (!screen) return null;
+  const s = STYLE[screen.kind];
+  const wristband = screen.kind === "standard" || screen.kind === "vip";
 
-function AdmittedResult({ t }) {
   return (
-    <div data-testid="scan-result-admitted">
-      <Heading Icon={CheckCircle2} color="text-emerald-400" text="Admitted — Checked In" />
-      <p className="font-mono2 text-sm text-white">{t.code}</p>
-      <p className="text-slate-300 text-sm mt-1">{t.holder_name} · {t.tier_name}</p>
-      <TierBadges tierName={t.tier_name} />
-      <p className="font-mono2 text-xs text-slate-400 mt-2">Ticket is now marked as used. Scan the next guest.</p>
-    </div>
-  );
-}
-
-function RefundedResult({ t }) {
-  return (
-    <div data-testid="scan-result-refunded">
-      <Heading Icon={XCircle} color="text-[#FF6A00]" text="Refunded / Cancelled" />
-      <p className="font-mono2 text-sm text-white">{t.code}</p>
-      <p className="font-mono2 text-sm text-slate-400 mt-2">This order was refunded or cancelled. Do not admit.</p>
-    </div>
-  );
-}
-
-function UsedResult({ t }) {
-  return (
-    <div data-testid="scan-result-used">
-      <Heading Icon={XCircle} color="text-[#FFE600]" text="Already Used" />
-      <p className="font-mono2 text-sm text-white">{t.code}</p>
-      <p className="text-slate-300 text-sm mt-1">{t.holder_name} · {t.tier_name}</p>
-      <TierBadges tierName={t.tier_name} />
-      <p className="font-mono2 text-xs text-slate-400 mt-2">
-        Checked in at {t.checked_in_at ? new Date(t.checked_in_at).toLocaleString("cs-CZ") : "—"}
-        {t.checked_in_by ? ` by ${t.checked_in_by}` : ""}
-      </p>
-    </div>
-  );
-}
-
-function InvalidResult() {
-  return (
-    <div data-testid="scan-result-invalid">
-      <Heading Icon={XCircle} color="text-[#FF0055]" text="Invalid Ticket" />
-      <p className="font-mono2 text-sm text-slate-400">This code does not exist. Do not admit.</p>
-    </div>
-  );
-}
-
-function ResultBody({ result, onCheckin }) {
-  if (!result) {
-    return <p className="font-mono2 text-sm text-slate-500 text-center uppercase tracking-[0.25em]">Scan a ticket to validate</p>;
-  }
-  const t = result.ticket;
-  if (result.result === "invalid") return <InvalidResult />;
-  if (!t) return null;
-  if (result.result === "valid") return <ValidResult t={t} onCheckin={onCheckin} />;
-  if (result.result === "admitted") return <AdmittedResult t={t} />;
-  if (result.result === "refunded") return <RefundedResult t={t} />;
-  if (result.result === "used") return <UsedResult t={t} />;
-  return null;
-}
-
-export function ScanResultPanel({ result, onCheckin }) {
-  return (
-    <div
-      data-testid="scan-result-panel"
-      className={`rounded-3xl border-2 p-8 min-h-[260px] flex flex-col justify-center transition-colors duration-300 ${panelCls(result?.result)}`}
+    <button
+      type="button"
+      onClick={onDismiss}
+      data-testid={`scan-screen-${screen.kind}`}
+      aria-label="Dismiss scan result"
+      className="fixed inset-0 z-[60] flex flex-col items-center justify-center text-center px-5 cursor-pointer"
+      style={{ background: s.bg, color: s.fg }}
     >
-      <ResultBody result={result} onCheckin={onCheckin} />
-    </div>
+      {screen.kind === "offline" ? (
+        <>
+          <WifiOff size={72} strokeWidth={3} className="mb-6" />
+          <p className="font-display font-black uppercase leading-none text-[11vw] sm:text-[72px]">Connection error</p>
+          <p className="font-display font-black uppercase text-2xl sm:text-4xl mt-6 border-4 border-white rounded-2xl px-6 py-3">
+            Do not admit
+          </p>
+        </>
+      ) : wristband ? (
+        <>
+          <p className="font-mono2 uppercase tracking-[0.4em] text-xs sm:text-sm mb-3 opacity-70">Admitted · wristband</p>
+          <p className="font-display font-black uppercase leading-none text-[26vw] sm:text-[180px]" data-testid="scan-wristband">
+            {s.title}
+          </p>
+          <div className="mt-8">
+            <GiftLine gift={screen.gift} />
+          </div>
+          <p className="font-mono2 text-xs sm:text-sm mt-8 opacity-70">{screen.code}{screen.holder ? ` · ${screen.holder}` : ""}</p>
+        </>
+      ) : (
+        <DeclinedBody screen={screen} />
+      )}
+      <p className="font-mono2 text-[10px] uppercase tracking-[0.3em] mt-10 opacity-60">Tap to scan next</p>
+    </button>
   );
 }

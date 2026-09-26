@@ -1767,17 +1767,38 @@ async def order_status_for(ticket: dict) -> str:
     return order.get("payment_status") or order.get("status", "paid_mock")
 
 
+async def ticket_admission(ticket: dict) -> dict:
+    """What the door must hand out: wristband type + surprise gift.
+    Gift only for VIP tickets that were really paid for (presale, incl. discount codes and upgrades).
+    Guest list, ambassador rewards and door comps get a VIP wristband but NO gift."""
+    is_vip = "VIP" in (ticket.get("tier_name") or "").upper()
+    gift = False
+    if is_vip and not ticket.get("guest_list"):
+        order = await db.orders.find_one({"id": ticket.get("order_id")}, {"_id": 0, "comp": 1, "amount_czk": 1})
+        gift = bool(order) and not order.get("comp") and (order.get("amount_czk") or 0) > 0
+    return {"wristband": "vip" if is_vip else "standard", "gift": gift}
+
+
+def decline_reason(order_status: str) -> str:
+    if order_status in ("refunded", "partially_refunded"):
+        return "REFUNDED"
+    if order_status == "cancelled":
+        return "CANCELLED"
+    return "UNPAID"
+
+
 @api_router.post("/scan/lookup")
 async def scan_lookup(data: ScanIn, admin=Depends(get_current_admin)):
     t = await find_ticket(data.code)
     if not t:
-        return {"result": "invalid", "ticket": None}
+        return {"result": "invalid", "reason": "INVALID", "ticket": None}
     order_status = await order_status_for(t)
     if t["status"] == "refunded" or order_status in ("refunded", "partially_refunded"):
-        return {"result": "refunded", "ticket": t}
+        return {"result": "refunded", "reason": "REFUNDED", "ticket": t}
     if order_status not in ("paid", "paid_mock"):
-        return {"result": "invalid", "ticket": t}
-    return {"result": t["status"], "ticket": t}
+        return {"result": "invalid", "reason": decline_reason(order_status), "ticket": t}
+    return {"result": t["status"], "reason": None if t["status"] == "valid" else "ALREADY USED",
+            "ticket": t, "admission": await ticket_admission(t)}
 
 
 @api_router.post("/scan/checkin")
@@ -1796,14 +1817,23 @@ async def scan_checkin(data: ScanIn, admin=Depends(get_current_admin)):
         if order_status in ("refunded", "partially_refunded"):
             await db.tickets.update_one({"id": t["id"]}, {"$set": {"status": "refunded"}})
             t["status"] = "refunded"
-            return {"result": "refunded", "ticket": t}
-        return {"result": "valid", "ticket": t}
+            return {"result": "refunded", "reason": "REFUNDED", "ticket": t}
+        if order_status not in ("paid", "paid_mock"):
+            # never burn a ticket whose order is not paid — put it back as valid
+            await db.tickets.update_one(
+                {"id": t["id"]},
+                {"$set": {"status": "valid", "checked_in_at": None, "checked_in_by": None}},
+            )
+            t.update(status="valid", checked_in_at=None, checked_in_by=None)
+            return {"result": "invalid", "reason": decline_reason(order_status), "ticket": t}
+        return {"result": "valid", "reason": None, "ticket": t, "admission": await ticket_admission(t)}
     existing = await db.tickets.find_one({"code": code}, {"_id": 0})
     if not existing:
-        return {"result": "invalid", "ticket": None}
+        return {"result": "invalid", "reason": "INVALID", "ticket": None}
     if existing["status"] == "refunded":
-        return {"result": "refunded", "ticket": existing}
-    return {"result": "used", "ticket": existing}
+        return {"result": "refunded", "reason": "REFUNDED", "ticket": existing}
+    return {"result": "used", "reason": "ALREADY USED", "ticket": existing,
+            "admission": await ticket_admission(existing)}
 
 
 # ---------------- admin ----------------
@@ -1851,12 +1881,17 @@ async def _sold_and_checked(query: dict) -> dict:
             "checked_in": await db.tickets.count_documents({**query, "status": "used"})}
 
 
+async def _guest_stats(tier_name: str) -> dict:
+    s = await _sold_and_checked({"guest_list": True, "tier_name": tier_name})
+    return {"sent": s["sold"], "checked_in": s["checked_in"]}
+
+
 async def category_stats() -> dict:
-    guest = await _sold_and_checked({"guest_list": True})
     return {
         "standard": await _sold_and_checked({"tier_name": "Standard Ticket", "guest_list": {"$ne": True}}),
         "vip": await _sold_and_checked({"tier_name": "VIP Table Ticket"}),
-        "vip_guest_list": {"sent": guest["sold"], "checked_in": guest["checked_in"]},
+        "vip_guest_list": await _guest_stats("VIP Guest List"),
+        "standard_guest_list": await _guest_stats("Standard Guest List"),
     }
 
 
@@ -1891,9 +1926,10 @@ async def admin_stats(admin=Depends(get_current_admin)):
         "per_tier": await per_tier_stats(tiers, paid_orders),
         "recent_scans": await db.tickets.find({"status": "used"}, {"_id": 0}).sort("checked_in_at", -1).to_list(20),
         "categories": await category_stats(),
-        "vip_guest_list": await db.tickets.find(
-            {"guest_list": True}, {"_id": 0, "code": 1, "buyer_email": 1, "created_at": 1, "status": 1}
-        ).sort("created_at", -1).to_list(500),
+        "guest_tickets": await db.tickets.find(
+            {"guest_list": True},
+            {"_id": 0, "code": 1, "buyer_email": 1, "created_at": 1, "status": 1, "tier_name": 1},
+        ).sort("created_at", -1).to_list(1000),
         "ambassadors": await ambassadors_overview(),
         "revenue_check": revenue_check_stats(paid_orders, tier_price),
     }
@@ -1924,6 +1960,28 @@ async def admin_sales_overview(admin=Depends(get_current_admin)):
     return {"today": utcnow().date().isoformat(), "rows": rows}
 
 
+@api_router.get("/admin/checkin-report")
+async def admin_checkin_report(admin=Depends(get_current_admin)):
+    """Read-only door report: how many tickets exist per type and how many were really scanned in."""
+    rows = await db.tickets.aggregate([
+        {"$group": {"_id": "$tier_name", "sold": {"$sum": 1},
+                    "checked_in": {"$sum": {"$cond": [{"$eq": ["$status", "used"]}, 1, 0]}}}},
+        {"$sort": {"sold": -1}},
+    ]).to_list(200)
+    scans = await db.tickets.find(
+        {"status": "used"},
+        {"_id": 0, "code": 1, "tier_name": 1, "holder_name": 1, "buyer_email": 1,
+         "checked_in_at": 1, "checked_in_by": 1},
+    ).sort("checked_in_at", -1).to_list(5000)
+    return {
+        "total_tickets": sum(r["sold"] for r in rows),
+        "checked_in": sum(r["checked_in"] for r in rows),
+        "by_tier": [{"tier_name": r["_id"] or "—", "sold": r["sold"], "checked_in": r["checked_in"]}
+                    for r in rows],
+        "scans": scans,
+    }
+
+
 @api_router.post("/admin/tickets/{code}/reset-checkin")
 async def admin_reset_checkin(code: str, admin=Depends(get_current_admin)):
     """Undo an accidental check-in: ticket becomes valid again. Order/payment untouched."""
@@ -1942,14 +2000,31 @@ async def admin_reset_checkin(code: str, admin=Depends(get_current_admin)):
 
 
 
+GUEST_TIERS = {
+    "vip": ("VIP_GUEST_LIST", "VIP Guest List", "VIP Guest"),
+    "standard": ("STANDARD_GUEST_LIST", "Standard Guest List", "Guest"),
+}
+
+
+class GuestListIn(BaseModel):
+    email: EmailStr
+    quantity: int = Field(default=1, ge=1, le=20)
+    category: str = "vip"  # "standard" | "vip"
+
+
 class VipGuestIn(BaseModel):
     email: EmailStr
 
 
-@api_router.post("/admin/vip-guest-list")
-async def admin_vip_guest_list(data: VipGuestIn, admin=Depends(get_current_admin)):
-    """Issue a free VIP Guest List ticket: same VIP access, emailed like regular tickets,
-    excluded from revenue and tickets-sold stats. QR is single-use like any ticket."""
+@api_router.post("/admin/guest-list")
+async def admin_guest_list(data: GuestListIn, admin=Depends(get_current_admin)):
+    """Issue free Standard/VIP guest-list tickets. 1 ticket = 1 unique single-use QR;
+    quantity N creates N separate tickets that go out in one email, each QR listed separately.
+    Guest tickets are excluded from revenue and paid-sales stats. No surprise gift at the door."""
+    cat = data.category.strip().lower()
+    if cat not in GUEST_TIERS:
+        raise HTTPException(400, "Category must be 'standard' or 'vip'")
+    tier_id, tier_name, holder = GUEST_TIERS[cat]
     event = await db.events.find_one({"active": True}, {"_id": 0})
     if not event:
         raise HTTPException(404, "No active event")
@@ -1958,28 +2033,38 @@ async def admin_vip_guest_list(data: VipGuestIn, admin=Depends(get_current_admin
     order = {
         "id": new_id(), "created_at": now, "updated_at": now,
         "event_id": event["id"], "event_name": event["name"],
-        "tier_id": "VIP_GUEST_LIST", "tier_name": "VIP Guest List",
-        "quantity": 1, "tickets_per_unit": 1, "amount_czk": 0, "list_price_czk": 0,
+        "tier_id": tier_id, "tier_name": tier_name,
+        "quantity": data.quantity, "tickets_per_unit": 1, "amount_czk": 0, "list_price_czk": 0,
         "unit_price_czk": 0, "promo_code": None, "discount_percent": None,
-        "currency": "CZK", "buyer_name": "VIP Guest", "buyer_email": email, "buyer_phone": "",
+        "currency": "CZK", "buyer_name": holder, "buyer_email": email, "buyer_phone": "",
         "payment_status": "paid", "paid_at": now, "fulfillment_status": "fulfilled",
-        "comp": True, "guest_list": True, "created_by": admin.get("email"),
+        "comp": True, "guest_list": True, "guest_category": cat, "created_by": admin.get("email"),
         "marketing_consent": False, "attribution": None, "gopay_payment_id": None,
     }
-    await db.orders.insert_one(order)
-    code = "ATF-" + secrets.token_hex(3).upper()
-    await db.tickets.insert_one({
-        "id": new_id(), "code": code, "order_id": order["id"],
-        "event_id": event["id"], "event_name": event["name"],
-        "tier_id": "VIP_GUEST_LIST", "tier_name": "VIP Guest List",
-        "holder_name": "VIP Guest", "buyer_email": email,
-        "guest_list": True,
-        "status": "valid", "created_at": now,
-        "checked_in_at": None, "checked_in_by": None,
-    })
+    await db.orders.insert_one(dict(order))
+    codes = []
+    for _ in range(data.quantity):
+        code = "ATF-" + secrets.token_hex(3).upper()
+        await db.tickets.insert_one({
+            "id": new_id(), "code": code, "order_id": order["id"],
+            "event_id": event["id"], "event_name": event["name"],
+            "tier_id": tier_id, "tier_name": tier_name,
+            "holder_name": holder, "buyer_email": email,
+            "guest_list": True, "guest_category": cat,
+            "status": "valid", "created_at": now,
+            "checked_in_at": None, "checked_in_by": None,
+        })
+        codes.append(code)
     asyncio.create_task(send_ticket_email_with_retry(order["id"]))
-    logger.warning("ADMIN %s sent VIP guest list ticket %s to %s", admin.get("email"), code, email)
-    return {"ok": True, "code": code, "email": email}
+    logger.warning("ADMIN %s sent %d %s guest list ticket(s) to %s",
+                   admin.get("email"), data.quantity, cat, email)
+    return {"ok": True, "category": cat, "quantity": data.quantity, "codes": codes, "email": email}
+
+
+@api_router.post("/admin/vip-guest-list")
+async def admin_vip_guest_list(data: VipGuestIn, admin=Depends(get_current_admin)):
+    r = await admin_guest_list(GuestListIn(email=data.email, quantity=1, category="vip"), admin)
+    return {"ok": True, "code": r["codes"][0], "email": r["email"]}
 
 
 class CompTicketIn(BaseModel):
