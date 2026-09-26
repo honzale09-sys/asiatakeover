@@ -71,7 +71,11 @@ export function ScanResultScreen({ screen, onNext }) {
         ) : WRISTBAND.has(screen.kind) ? (
           <>
             <p className="font-mono2 uppercase tracking-[0.4em] text-[10px] sm:text-sm opacity-70">Admitted · wristband</p>
-            <p className="font-display font-black uppercase leading-none text-[24vw] sm:text-[150px]" data-testid="scan-wristband">
+            <p
+              className="font-display font-black uppercase leading-none w-full text-center whitespace-nowrap"
+              style={{ fontSize: `min(${Math.min(26, Math.floor(95 / Math.max(s.title.length, 3)))}vw, 150px)` }}
+              data-testid="scan-wristband"
+            >
               {s.title}
             </p>
             <GiftLine gift={screen.gift} />

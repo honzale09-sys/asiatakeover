@@ -1,0 +1,40 @@
+{
+  "summary": "Full regression of the new Door Control scanner + PWA shell and admin/public regression. Backend: 11/11 pytest cases pass on the preview URL (PWA assets 200, test-tickets generate/reset/list/delete, /api/scan/checkin invalid→valid→used flow with atomic single-use, discount codes rejected for Gold Table and Group of 4, admin stats + checkin-report exclude test tickets). Frontend: on 390x844 viewport /nascanujtobrasko login shows the scanner shell with ALL required data-testids visible without page scroll (scrollHeight == innerHeight == 844). Manual entry flows verified: ATF-NOPE00 → full-red DECLINED/INVALID with DO NOT GIVE WRISTBAND OR GIFT and working SCAN NEXT; paid_standard → cyan STANDARD screen + red X 'NO SURPRISE GIFT' + TEST TICKET banner; paid_vip → yellow VIP screen + green check 'SURPRISE GIFT'; vip_guest_list → yellow VIP screen + 'NO SURPRISE GIFT'; re-scan of the same code → red ALREADY USED with correct 'First scan …' timestamp and admin email. Header counter increments correctly (3 in · 2 out). Scanner PWA head is correctly injected on /nascanujtobrasko (manifest=/scanner.webmanifest, apple-touch-icon=/assets/door-icon-180.png, apple-mobile-web-app-capable=yes, apple-mobile-web-app-title=Door Control, viewport contains viewport-fit=cover) and correctly ABSENT on the public homepage /. Admin regression: Overview (Revenue 9 629 Kč / Tickets Sold 22 / Checked In 5 / Orders 15 — unchanged after test scans), TEST MODE card with all 4 testids, all tabs (Orders & Tickets, Discount Codes, Messages, Ambassadors, Ticket Tiers, Site Content) load. Public homepage renders GET TICKETS + UPGRADE TO VIP.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/test-tickets/generate-all", "issue": "Not idempotent — each call appends 6 more test tickets. During this test session there were 24 rows in db.test_tickets until DELETE was called. The spec says 'creates exactly 6 labelled tickets'. Recommend making it idempotent (delete existing first, or upsert by kind) so that admins clicking the button twice never end up with duplicates."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ScanResultPanel (STANDARD screen)", "issue": "The huge 'STANDARD' headline overflows a 390px viewport horizontally — it is rendered as '...TANDA...' cut off on both sides on iPhone-sized screens. VIP/DECLINED/USED all fit fine because their words are shorter. Suggest clamping the font-size for 'STANDARD' (e.g. text-[clamp(56px,18vw,140px)] or word-break/whitespace-nowrap + scale-to-fit) so the full word is always visible.", "selector": "[data-testid=\"scan-screen-standard\"] .headline", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_scanner_pwa_regression.py",
+    "/app/test_reports/pytest/scanner_pwa.xml"
+  ],
+  "action_items": [
+    "Make POST /api/admin/test-tickets/generate-all idempotent so repeated clicks never create duplicate test tickets (currently possible to end up with 12/18/24 test tickets).",
+    "Fix STANDARD headline overflow on ScanResultPanel at 390x844 — the word gets clipped horizontally. Reduce font-size / use clamp() or fit-to-container so the full word 'STANDARD' is always visible on phone screens.",
+    "Cleanup: I left 6 valid test tickets in the DB after reset (state ready for main-agent verification). The bogus discount code TESTBLK1 was also generated during testing — main agent can delete it if desired (I attempted deletion but the DELETE /api/admin/discount-codes endpoint id/code lookup was not confirmed)."
+  ],
+  "critical_code_review_comments": [
+    "generate-all endpoint is O(N) additive rather than idempotent — same as spec violation flagged above.",
+    "Scanner login page correctly shows PWA head only on /nascanujtobrasko (usePwaShell removes tags on unmount) — verified head on / has no manifest and no apple-mobile-web-app-capable meta. Good separation between public site and door PWA.",
+    "STANDARD headline font-size is not responsive to narrow phone widths."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_scanner_pwa_regression.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "95%"},
+  "test_credentials": "admin@asiatakeover.eu / Takeover2026! (from /app/memory/test_credentials.md) — works for both /admin and /nascanujtobrasko",
+  "seed_data_creation": "Regenerated 6 test tickets via POST /api/admin/test-tickets/generate-all after cleanup DELETE; scanned 3 of them (paid_standard, paid_vip, vip_guest_list) then re-scanned paid_standard to verify ALREADY USED, then called reset so they are all valid again. Also created a discount code TESTBLK1 (10% off) that was used to verify gold/group rejection — leftover.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New pytest file /app/backend/tests/test_scanner_pwa_regression.py covers PWA assets, test-mode APIs, scan flow, isolation from admin stats, and gold/group discount block. Run with `pytest /app/backend/tests/test_scanner_pwa_regression.py -o addopts=''` (default addopts uses xdist and creates a race between the reset test and the used-scan test). Preview baseline confirmed: Revenue 9 629 Kč / Tickets Sold 22 / Orders 15 / Checked In 5 (baseline was 6 in note but preview DB currently shows 5 — either way test scans did NOT change any of these numbers, isolation is intact).",
+  "rca of the issue": "Not applicable — no functional bugs. Only two improvements: (a) POST /api/admin/test-tickets/generate-all should be idempotent, currently appends 6 rows every call; (b) The 'STANDARD' word on the cyan admitted screen overflows a 390px viewport horizontally because its font-size is not clamped to viewport width."
+}

@@ -13,6 +13,7 @@ ADMIN = {"email": _ENV["ADMIN_EMAIL"], "password": _ENV["ADMIN_PASSWORD"]}
 @pytest.fixture(scope="module")
 def admin():
     s = requests.Session()
+    s.headers["User-Agent"] = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"
     r = s.post(f"{BASE_URL}/api/auth/login", json=ADMIN, timeout=15)
     assert r.status_code == 200, r.text
     return s
@@ -31,17 +32,23 @@ def test_tickets_sold_counts_all_incl_guest_list(admin):
 
 
 def test_reset_used_ticket_flow(admin):
-    s = admin.get(f"{BASE_URL}/api/admin/stats", timeout=15).json()
-    used = [t for t in s["recent_scans"] if t.get("status") == "used"]
-    if not used:
-        pytest.skip("no checked-in tickets in preview to reset")
-    code = used[0]["code"]
-    r = admin.post(f"{BASE_URL}/api/admin/tickets/{code}/reset-checkin", timeout=15)
+    """Uses its own throwaway comp ticket — real orders, tickets and check-ins are never touched."""
+    r = admin.post(f"{BASE_URL}/api/admin/comp-tickets",
+                   json={"quantity": 1, "holder_name": "Reset Regression", "category": "standard"}, timeout=20)
     assert r.status_code == 200, r.text
-    assert r.json()["status"] == "valid"
-    # second reset rejected — no longer checked in
-    r2 = admin.post(f"{BASE_URL}/api/admin/tickets/{code}/reset-checkin", timeout=15)
-    assert r2.status_code == 400
-    # unknown ticket 404
-    r3 = admin.post(f"{BASE_URL}/api/admin/tickets/ATF-FFFFFF/reset-checkin", timeout=15)
-    assert r3.status_code == 404
+    comp = r.json()
+    code = comp["tickets"][0]["code"]
+    try:
+        scan = admin.post(f"{BASE_URL}/api/scan/checkin", json={"code": code}, timeout=15).json()
+        assert scan["result"] == "valid", scan
+        r = admin.post(f"{BASE_URL}/api/admin/tickets/{code}/reset-checkin", timeout=15)
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == "valid"
+        # second reset rejected — no longer checked in
+        r2 = admin.post(f"{BASE_URL}/api/admin/tickets/{code}/reset-checkin", timeout=15)
+        assert r2.status_code == 400
+        # unknown ticket 404
+        r3 = admin.post(f"{BASE_URL}/api/admin/tickets/ATF-FFFFFF/reset-checkin", timeout=15)
+        assert r3.status_code == 404
+    finally:
+        assert admin.delete(f"{BASE_URL}/api/admin/orders/{comp['order_id']}", timeout=20).status_code == 200

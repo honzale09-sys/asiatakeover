@@ -2085,7 +2085,9 @@ async def admin_test_ticket_create(data: TestTicketIn, admin=Depends(get_current
 @api_router.post("/admin/test-tickets/generate-all")
 async def admin_test_tickets_all(admin=Depends(get_current_admin)):
     """One unique single-use test QR per ticket situation — no payments, no Teya, no capacity,
-    no discount-code usage, no ambassador sales, nothing counted in real statistics."""
+    no discount-code usage, no ambassador sales, nothing counted in real statistics.
+    Idempotent: replaces the previous test set so repeated clicks never pile up duplicates."""
+    await db.test_tickets.delete_many({})
     return [await create_test_ticket(kind, admin) for kind in TEST_KINDS]
 
 
