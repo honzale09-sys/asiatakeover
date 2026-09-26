@@ -4,6 +4,7 @@ import { api, formatError, czk } from "@/api";
 import { StatCard, cardCls } from "./shared";
 import { GuestListCard } from "./GuestListCard";
 import { CheckinReportCard } from "./CheckinReportCard";
+import { TestModeCard } from "./TestModeCard";
 import { SalesOverview } from "./SalesOverview";
 
 function CategoryCard({ label, color, data, testid }) {
@@ -71,6 +72,7 @@ export function OverviewTab() {
       <CheckinReportCard refreshKey={tick} />
       {stats.revenue_check && <RevenueCheckCard stats={stats} />}
       <SalesOverview />
+      <TestModeCard />
     </div>
   );
 }

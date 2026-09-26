@@ -55,6 +55,11 @@ export function ScanResultScreen({ screen, onDismiss }) {
       className="fixed inset-0 z-[60] flex flex-col items-center justify-center text-center px-5 cursor-pointer"
       style={{ background: s.bg, color: s.fg }}
     >
+      {screen.test && (
+        <p className="absolute top-5 left-0 right-0 font-mono2 text-[11px] sm:text-sm uppercase tracking-[0.3em] font-bold" data-testid="scan-test-badge">
+          Test ticket{screen.label ? ` · ${screen.label}` : ""}
+        </p>
+      )}
       {screen.kind === "offline" ? (
         <>
           <WifiOff size={72} strokeWidth={3} className="mb-6" />

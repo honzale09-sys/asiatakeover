@@ -1791,6 +1791,11 @@ def decline_reason(order_status: str) -> str:
 async def scan_lookup(data: ScanIn, admin=Depends(get_current_admin)):
     t = await find_ticket(data.code)
     if not t:
+        tt = await db.test_tickets.find_one({"code": normalize_code(data.code)}, {"_id": 0})
+        if tt:
+            return {"result": tt["status"], "reason": None if tt["status"] == "valid" else "ALREADY USED",
+                    "ticket": test_ticket_public(tt), "test": True,
+                    "admission": {"wristband": tt["wristband"], "gift": tt["gift"]}}
         return {"result": "invalid", "reason": "INVALID", "ticket": None}
     order_status = await order_status_for(t)
     if t["status"] == "refunded" or order_status in ("refunded", "partially_refunded"):
@@ -1829,11 +1834,29 @@ async def scan_checkin(data: ScanIn, admin=Depends(get_current_admin)):
         return {"result": "valid", "reason": None, "ticket": t, "admission": await ticket_admission(t)}
     existing = await db.tickets.find_one({"code": code}, {"_id": 0})
     if not existing:
-        return {"result": "invalid", "reason": "INVALID", "ticket": None}
+        return await scan_checkin_test(code, admin)
     if existing["status"] == "refunded":
         return {"result": "refunded", "reason": "REFUNDED", "ticket": existing}
     return {"result": "used", "reason": "ALREADY USED", "ticket": existing,
             "admission": await ticket_admission(existing)}
+
+
+async def scan_checkin_test(code: str, admin: dict) -> dict:
+    """Private test QR codes: same single-use behaviour, zero impact on real data or statistics."""
+    tt = await db.test_tickets.find_one_and_update(
+        {"code": code, "status": "valid"},
+        {"$set": {"status": "used", "checked_in_at": utcnow().isoformat(),
+                  "checked_in_by": admin.get("email")}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not tt:
+        tt = await db.test_tickets.find_one({"code": code}, {"_id": 0})
+        if not tt:
+            return {"result": "invalid", "reason": "INVALID", "ticket": None}
+        return {"result": "used", "reason": "ALREADY USED", "ticket": test_ticket_public(tt), "test": True,
+                "admission": {"wristband": tt["wristband"], "gift": tt["gift"]}}
+    return {"result": "valid", "reason": None, "ticket": test_ticket_public(tt), "test": True,
+            "admission": {"wristband": tt["wristband"], "gift": tt["gift"]}}
 
 
 # ---------------- admin ----------------
@@ -1980,6 +2003,74 @@ async def admin_checkin_report(admin=Depends(get_current_admin)):
                     for r in rows],
         "scans": scans,
     }
+
+
+# ---------------- private test mode (admin only) ----------------
+# Test QR codes live in their own collection: they go through the real scanner flow but are
+# invisible to orders, revenue, sold tickets, check-ins and every statistic.
+
+TEST_KINDS = {
+    "paid_standard": {"label": "TEST 1 · Paid Standard — full price", "wristband": "standard", "gift": False},
+    "paid_standard_discount": {"label": "TEST 2 · Paid Standard — with discount", "wristband": "standard", "gift": False},
+    "paid_vip": {"label": "TEST 3 · Paid VIP — full price", "wristband": "vip", "gift": True},
+    "paid_vip_discount": {"label": "TEST 4 · Paid VIP — with discount", "wristband": "vip", "gift": True},
+    "standard_guest_list": {"label": "TEST 5 · Standard Guest List", "wristband": "standard", "gift": False},
+    "vip_guest_list": {"label": "TEST 6 · VIP Guest List", "wristband": "vip", "gift": False},
+}
+
+
+class TestTicketIn(BaseModel):
+    kind: str
+
+
+def test_ticket_public(t: dict) -> dict:
+    return {"code": t["code"], "kind": t["kind"], "tier_name": t["label"], "holder_name": "TEST",
+            "status": t["status"], "checked_in_at": t.get("checked_in_at"),
+            "checked_in_by": t.get("checked_in_by"), "created_at": t.get("created_at"),
+            "wristband": t["wristband"], "gift": t["gift"]}
+
+
+async def create_test_ticket(kind: str, admin: dict) -> dict:
+    for _ in range(10):
+        code = "ATF-" + secrets.token_hex(3).upper()
+        if not await db.tickets.find_one({"code": code}) and not await db.test_tickets.find_one({"code": code}):
+            break
+    else:
+        raise HTTPException(500, "Could not generate a free code")
+    doc = {"id": new_id(), "code": code, "kind": kind, **TEST_KINDS[kind], "status": "valid",
+           "created_at": utcnow().isoformat(), "created_by": admin.get("email"),
+           "checked_in_at": None, "checked_in_by": None}
+    await db.test_tickets.insert_one(dict(doc))
+    logger.warning("ADMIN %s created TEST ticket %s (%s)", admin.get("email"), code, kind)
+    return test_ticket_public(doc)
+
+
+@api_router.get("/admin/test-tickets")
+async def admin_test_tickets(admin=Depends(get_current_admin)):
+    rows = await db.test_tickets.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return [test_ticket_public(t) for t in rows]
+
+
+@api_router.post("/admin/test-tickets")
+async def admin_test_ticket_create(data: TestTicketIn, admin=Depends(get_current_admin)):
+    kind = data.kind.strip().lower()
+    if kind not in TEST_KINDS:
+        raise HTTPException(400, "Unknown test ticket kind")
+    return await create_test_ticket(kind, admin)
+
+
+@api_router.post("/admin/test-tickets/generate-all")
+async def admin_test_tickets_all(admin=Depends(get_current_admin)):
+    """One unique single-use test QR per ticket situation — no payments, no Teya, no capacity,
+    no discount-code usage, no ambassador sales, nothing counted in real statistics."""
+    return [await create_test_ticket(kind, admin) for kind in TEST_KINDS]
+
+
+@api_router.delete("/admin/test-tickets")
+async def admin_test_tickets_delete(admin=Depends(get_current_admin)):
+    n = (await db.test_tickets.delete_many({})).deleted_count
+    logger.warning("ADMIN %s deleted %d test ticket(s)", admin.get("email"), n)
+    return {"ok": True, "deleted": n}
 
 
 @api_router.post("/admin/tickets/{code}/reset-checkin")
@@ -2442,6 +2533,7 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
     await db.tickets.create_index("code", unique=True)
+    await db.test_tickets.create_index("code", unique=True)
     await db.tickets.create_index("order_id")
     await db.orders.create_index("id", unique=True)
     await db.sim_payments.create_index("id", unique=True)

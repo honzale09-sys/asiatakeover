@@ -23,6 +23,8 @@ export function screenFor(data) {
       gift: !!data.admission?.gift,
       code: data.ticket?.code,
       holder: data.ticket?.holder_name,
+      test: !!data.test,
+      label: data.test ? data.ticket?.tier_name : null,
     };
   }
   return {
@@ -31,6 +33,8 @@ export function screenFor(data) {
     code: data.ticket?.code,
     firstScan: data.ticket?.checked_in_at,
     by: data.ticket?.checked_in_by,
+    test: !!data.test,
+    label: data.test ? data.ticket?.tier_name : null,
   };
 }
 
