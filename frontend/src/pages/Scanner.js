@@ -56,7 +56,7 @@ function useCamera(onCode) {
     try {
       const s = new Html5Qrcode("qr-reader");
       scannerRef.current = s;
-      await s.start({ facingMode: "environment" }, { fps: 8, qrbox: { width: 240, height: 240 } }, (text) => onCode(text), () => {});
+      await s.start({ facingMode: "environment" }, { fps: 8, qrbox: { width: 240, height: 240 } }, (text) => onCode(text, true), () => {});
       setCameraOn(true);
     } catch (e) {
       console.warn("Scanner: camera start failed", e);
@@ -88,12 +88,16 @@ export default function Scanner() {
   const [log, setLog] = useState([]);
   const [stats, setStats] = useState({ admitted: 0, declined: 0 });
   const processingRef = useRef(false);
+  const lastRef = useRef({ code: "", at: 0 });
 
   // One scan = one atomic server check-in. No second confirmation tap, no offline admits.
-  const handleCode = useCallback(async (raw) => {
+  const handleCode = useCallback(async (raw, fromCamera = false) => {
     if (processingRef.current || !raw) return;
-    processingRef.current = true;
     const clean = raw.trim().toUpperCase();
+    // the camera keeps decoding the same QR while it stays in frame — ignore it for a few seconds
+    if (fromCamera && clean === lastRef.current.code && Date.now() - lastRef.current.at < 8000) return;
+    processingRef.current = true;
+    lastRef.current = { code: clean, at: Date.now() };
     try {
       const r = await withRefresh(() => api.post("/scan/checkin", { code: clean }));
       const next = screenFor(r.data);

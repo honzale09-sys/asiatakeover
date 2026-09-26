@@ -4,11 +4,13 @@ import { FlaskConical, Trash2 } from "lucide-react";
 import { api, API, formatError } from "@/api";
 import { cardCls, actBtn, fmtDate } from "./shared";
 
-function TestRow({ t }) {
+function TestRow({ t, onZoom }) {
   const used = t.status === "used";
   return (
     <div className="flex items-center gap-4 border border-white/10 rounded-xl p-3" data-testid={`test-ticket-${t.code}`}>
-      <img src={`${API}/qr/${t.code}.png`} alt={`QR ${t.code}`} className="w-20 h-20 rounded-lg bg-white p-1 shrink-0" />
+      <button type="button" onClick={() => onZoom(t)} title="Click to enlarge for phone scanning" data-testid={`test-qr-${t.code}`}>
+        <img src={`${API}/qr/${t.code}.png`} alt={`QR ${t.code}`} className="w-20 h-20 rounded-lg bg-white p-1 shrink-0 hover:scale-105 transition-transform" />
+      </button>
       <div className="min-w-0 flex-1">
         <p className="font-display font-bold text-sm text-white truncate">{t.tier_name}</p>
         <p className="font-mono2 text-xs text-slate-400 mt-0.5">{t.code}</p>
@@ -31,6 +33,7 @@ function TestRow({ t }) {
 export function TestModeCard() {
   const [list, setList] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState(null);
   const load = useCallback(
     () => api.get("/admin/test-tickets").then((r) => setList(r.data)).catch((e) => toast.error(formatError(e))),
     []
@@ -85,9 +88,24 @@ export function TestModeCard() {
         </p>
       )}
       <div className="grid gap-3 sm:grid-cols-2" data-testid="test-ticket-list">
-        {list.map((t) => <TestRow key={t.code} t={t} />)}
+        {list.map((t) => <TestRow key={t.code} t={t} onZoom={setZoom} />)}
         {list.length === 0 && <p className="text-slate-600 text-xs font-mono2">No test tickets — click “Generate all test tickets”.</p>}
       </div>
+      <p className="font-mono2 text-[10px] text-slate-600 mt-3">Click a QR to enlarge it, then scan it with the phone scanner of THIS environment.</p>
+
+      {zoom && (
+        <button
+          type="button" onClick={() => setZoom(null)} data-testid="test-qr-zoom"
+          className="fixed inset-0 z-[70] bg-black/90 flex flex-col items-center justify-center px-6 gap-6"
+        >
+          <p className="font-display font-black uppercase text-lg sm:text-2xl text-[#FF6A00] text-center">{zoom.tier_name}</p>
+          <img src={`${API}/qr/${zoom.code}.png`} alt={`QR ${zoom.code}`} className="w-[70vw] max-w-[380px] rounded-2xl bg-white p-4" />
+          <p className="font-mono2 text-sm text-slate-300">{zoom.code}</p>
+          <p className="font-mono2 text-[11px] text-slate-500">
+            {zoom.wristband === "vip" ? "VIP wristband" : "Standard wristband"} · {zoom.gift ? "surprise gift YES" : "surprise gift NO"} · tap to close
+          </p>
+        </button>
+      )}
     </div>
   );
 }
