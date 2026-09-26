@@ -27,7 +27,7 @@ export function CheckoutModal({ tier, event, onClose, refCode }) {
 
   const refAutoApplied = useRef(false);
   useEffect(() => {
-    if (refCode && !refAutoApplied.current && kind !== "gold") {
+    if (refCode && !refAutoApplied.current && kind !== "gold" && kind !== "group") {
       refAutoApplied.current = true;
       applyPromo(refCode);
     }

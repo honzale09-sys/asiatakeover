@@ -28,7 +28,7 @@ export function CheckoutForm({ kind, displayName, event, buyer, setBuyer, qty, s
         <Field label={t("checkout.phone")} testid="checkout-phone-input" type="tel" value={buyer.phone} onChange={set("phone")} placeholder="+420 …" />
         <QuantityField kind={kind} qty={qty} setQty={setQty} maxQty={maxQty} />
       </div>
-      {kind !== "gold" && <PromoField {...promo} listPrice={listPrice} qty={qty} />}
+      {kind !== "gold" && kind !== "group" && <PromoField {...promo} listPrice={listPrice} qty={qty} />}
       <button
         type="submit"
         data-testid="checkout-pay-button"

@@ -1331,9 +1331,9 @@ async def assert_tier_capacity(tier: dict, quantity: int, tickets_per_unit: int,
         raise HTTPException(400, "Not enough tickets left in this tier")
 
 
-async def apply_discount_code(code: str, unit_price: int, quantity: int, restricted: bool):
+async def apply_discount_code(code: str, unit_price: int, quantity: int):
     """Resolve promo / ambassador / ambassador-50% codes. Returns (unit_price, discount_percent, code_used).
-    `restricted` = GROUP/GOLD tiers where ambassador codes are not accepted."""
+    Gold Table and Group of 4 never reach this — no code applies to those tiers."""
     c = code.strip().upper()
     promo = await db.promo_codes.find_one({"code": c, "active": True})
     if promo:
@@ -1349,8 +1349,6 @@ async def apply_discount_code(code: str, unit_price: int, quantity: int, restric
         return max(1, round(unit_price * (100 - pct) / 100)), pct, c
     amb = await db.ambassadors.find_one({"code": c, "active": True})
     if amb:
-        if restricted:
-            raise HTTPException(400, "This code is valid for Standard and VIP Table tickets only")
         left = AMB_MAX_USES - await ambassador_sales(c)
         if left <= 0:
             raise HTTPException(400, "This code has no discounted tickets left")
@@ -1359,8 +1357,6 @@ async def apply_discount_code(code: str, unit_price: int, quantity: int, restric
         return max(1, unit_price - amb.get("discount_czk", AMB_DISCOUNT_CZK)), None, c
     amb2 = await db.ambassadors.find_one({"fifty.code": c, "active": True})
     if amb2 and not amb2["fifty"].get("redeemed"):
-        if restricted:
-            raise HTTPException(400, "This code is valid for Standard and VIP Table tickets only")
         if quantity > 1:
             raise HTTPException(400, "This code is valid for one ticket only")
         return max(1, round(unit_price / 2)), 50, c
@@ -1445,10 +1441,10 @@ async def create_order(data: OrderCreateIn, request: Request):
     await assert_tier_capacity(tier, data.quantity, tickets_per_unit, is_gold)
     unit_price, discount_percent, promo_code_used = tier["price_czk"], None, None
     if data.promo_code:
-        if is_gold:
-            raise HTTPException(400, "Discount codes cannot be used for the Gold Table")
+        if is_gold or is_group:
+            raise HTTPException(400, "Discount codes cannot be used for the Gold Table or the Group of 4 bundle")
         unit_price, discount_percent, promo_code_used = await apply_discount_code(
-            data.promo_code, unit_price, data.quantity, restricted=is_group or is_gold)
+            data.promo_code, unit_price, data.quantity)
     if is_gold:
         amount = 3999 + 899 * data.quantity
         unit_price = round(amount / data.quantity)
