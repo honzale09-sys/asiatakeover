@@ -1,0 +1,35 @@
+{
+  "summary": "Full regression of the new door-staff role + rewritten scanner detection layer + no-auto-dismiss result screens + diagnostics panel. Backend: 15/15 pytest cases pass on preview URL (test_door_staff_role.py) — DOORSTAFF login works case-insensitively (DOORSTAFF and doorstaff both 200 with role=door), wrong password returns 401, all 6 /api/admin/* endpoints return 403 for the door session (stats, orders, test-tickets, promo-codes, checkin-report, sales-overview), and the door session CAN reach /api/auth/me (200, role=door), /api/scan/lookup (200 invalid), /api/scan/checkin (200 result=invalid), /api/auth/refresh (200). Admin session still reaches all 6 /api/admin/* endpoints and /api/admin/stats returns revenue_czk/tickets_sold/checked_in/orders. Full backend regression from previous iteration remains green. Frontend (390x844 iPhone): /nascanujtobrasko login form has type=text (not email), wrong password shows error and no session, lowercase 'doorstaff' + correct password opens scanner-page. All required data-testids present (camera-viewport, camera-video with playsInline+muted set via React props, no CSS mirroring transform=none, camera-start-button, camera-restart-button, qr-code-input, scan-check-button, last-result, scanner-legend, scan-log, scanner-stats, diag-open-button). No page scroll (scrollHeight==innerHeight==844). Diagnostics panel opens with Camera=NO / Decoder=NO before camera start; after scans diag-last-response contains 'ATF-704FFF → used / ALREADY USED / standard'; diag-close-button closes it. All 6 test tickets via manual entry render the correct result screen kind (TEST 1/2/5 → scan-screen-standard cyan 'STANDARD' + 'NO SURPRISE GIFT'; TEST 3/4 → scan-screen-vip yellow 'VIP' + 'SURPRISE GIFT'; TEST 6 → scan-screen-vip yellow 'VIP' + 'NO SURPRISE GIFT') and each shows the 'TEST TICKET · <label>' banner. Exactly 1 POST /api/scan/checkin per manual entry. Unknown code ATF-NOPE00 → scan-screen-declined with 'INVALID' + 'DO NOT GIVE WRISTBAND OR GIFT'. Re-entering an already-scanned code → scan-screen-used 'ALREADY USED' with 'First scan 27. 9. 2026 0:02:06 · doorstaff'. NO auto-dismiss verified: waited 8.5s on the DECLINED screen, still visible, zero extra /api/scan/checkin requests during the wait. camera-start-button/camera-restart-button do not crash the page in headless (no camera available). scanner-stats increments correctly ('6 in · 2 out'). Admin regression: door session hitting /admin correctly shows the Command Deck LOGIN screen; admin login into /admin loads Overview with revenue + all tab labels (Orders, Discount, Messages, Ambassadors, Ticket Tiers, Site Content, TEST MODE). Public homepage renders GET TICKETS + UPGRADE TO VIP. TEST DATA ISOLATION VERIFIED: baseline revenue_czk=9629, tickets_sold=22, checked_in=4, orders=15 — unchanged after all 6 scans + already-used + unknown scans; check-in report contains zero rows starting with 'TEST'. Test tickets were reset (6 reset) at the end for the next tester.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_door_staff_role.py",
+    "/app/test_reports/pytest/door_staff.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Door-role authorization implemented cleanly: get_current_admin now requires role=='admin' (403 otherwise) for /api/admin/*, and a separate get_current_staff (admin+door) protects /api/auth/me, /api/scan/lookup, /api/scan/checkin — good separation of concerns.",
+    "LoginIn.email accepts plain str (identifier normalised via strip().lower()) which enables case-insensitive DOORSTAFF login and preserves admin email login — correctly implemented.",
+    "Result screens no longer auto-dismiss (Scanner.js scanNext is the only path back), and pausedRef in useQrScanner prevents any additional detections while a result is displayed — verified by network trace (1 request per entry, 0 during 8s wait).",
+    "camera-video is a React <video> element with playsInline+muted+autoPlay + no CSS transform (not mirrored) — spec compliant. Note: getAttribute('muted') returns null in headless because React sets .muted as a property, not attribute — this is expected React behaviour and NOT a bug (the property is true).",
+    "Diagnostics panel correctly gated behind the scanner/admin session (route + component render).",
+    "Test data isolation is intact — revenue/tickets_sold/checked_in/orders unchanged after full test-ticket rehearsal; check-in report excludes TEST rows."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_door_staff_role.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "DOORSTAFF / NinjaSapafood123! (door, case-insensitive) and admin@asiatakeover.eu / Takeover2026! (admin) — both verified.",
+  "seed_data_creation": "Regenerated the 6 test tickets via POST /api/admin/test-tickets/generate-all (codes ATF-704FFF, ATF-4E3371, ATF-8E144E, ATF-F14053, ATF-D35003, ATF-2A2FB6), scanned all 6 through the UI plus one already-used replay and one unknown code, then called POST /api/admin/test-tickets/reset (reset=6) so the same 6 codes are valid again for the next run. No production orders/tickets/check-ins were created, modified or deleted.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New pytest file: /app/backend/tests/test_door_staff_role.py (15 tests, all pass with -o addopts=''). Baseline preview DB numbers (verified unchanged after this run): revenue_czk=9629, tickets_sold=22, checked_in=4, orders=15. WAF blocks non-browser UAs on /api/scan/* — the pytest file already sends a Mozilla UA. Camera detection layer was NOT re-tested against a real camera (headless has none) — the main agent already verified the new getUserMedia + jsQR/ZXing/BarcodeDetector chain via a canvas mediaStream stub (12/12 + 6/6 detections). Test tickets were reset to valid at the end.",
+  "rca of the issue": "Not applicable — all requested door-staff-role, no-auto-dismiss, diagnostics, manual-entry result-screen and admin/public regression checks pass. No functional issues to report."
+}
