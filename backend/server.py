@@ -2352,6 +2352,39 @@ async def resend_ticket_email(order_id: str, admin=Depends(get_current_admin)):
         raise HTTPException(502, f"Email send failed: {msg}")
 
 
+@api_router.post("/admin/orders/resend-unsent")
+async def resend_unsent_ticket_emails(admin=Depends(get_current_admin)):
+    """Find every PAID order whose ticket email never went out and resend the exact same tickets.
+    Skips permanently undeliverable addresses. Real tickets/QR codes are never regenerated —
+    the buyer receives the same QR they already paid for. Nothing here touches statistics."""
+    orders = await db.orders.find(
+        {"payment_status": "paid", "ticket_email_sent_at": None},
+        {"_id": 0},
+    ).sort("created_at", 1).to_list(5000)
+    results, sent = [], 0
+    for o in orders:
+        if "Undeliverable" in (o.get("ticket_email_error") or ""):
+            results.append({"email": o.get("buyer_email"), "ok": False, "skipped": "undeliverable"})
+            continue
+        try:
+            email_id = await send_ticket_email(o)
+            await db.orders.update_one(
+                {"id": o["id"]},
+                {"$set": {"ticket_email_sent_at": utcnow().isoformat(),
+                          "ticket_email_id": email_id, "ticket_email_error": None}},
+            )
+            sent += 1
+            results.append({"email": o.get("buyer_email"), "ok": True})
+        except Exception as e:
+            msg = str(e)[:200]
+            await db.orders.update_one({"id": o["id"]}, {"$set": {"ticket_email_error": msg}})
+            results.append({"email": o.get("buyer_email"), "ok": False, "error": msg})
+        await asyncio.sleep(0.6)  # pace under the email provider rate limit
+    logger.warning("ADMIN %s bulk-resent %d/%d undelivered ticket email(s)",
+                   admin.get("email"), sent, len(orders))
+    return {"ok": True, "candidates": len(orders), "sent": sent, "results": results}
+
+
 @api_router.get("/admin/messages")
 async def admin_messages(admin=Depends(get_current_admin)):
     return await db.messages.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)

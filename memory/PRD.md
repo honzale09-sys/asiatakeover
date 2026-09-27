@@ -5,6 +5,11 @@
 
 User choices: MOCKED demo checkout; sections Hero + Lineup + Tickets + FAQ + Contact; event 27.09.2026 at DUPLEX Prague, 3 floors, 10 DJs, 2 rooftops, genres (K-POP, HipHop/RnB, Vinahouse, Pop Hits, J-POP, Choreography Dance), 2 photobooth zones, VIP zones, soju, presented by DUPLEX x SeoulVibes x GANGSHII; admin page for sales/tickets/parties CRUD/site content; door QR scanner at /nascanujtobrasko; English.
 
+## Ticket delivery recovery + check-in reset (2026-06)
+- `POST /api/admin/orders/resend-unsent` — bulk-resends the same tickets to every PAID order with `ticket_email_sent_at=None`, skipping permanently-undeliverable addresses (paced 0.6s). Admin → Orders & Tickets shows a yellow banner "N paid buyer(s) never received their ticket" + "Resend all now" (`data-testid=resend-all-undelivered`). Per-order "resend tickets" still exists. Startup sweep `retry_unsent_ticket_emails` also auto-resends undelivered paid orders on each deploy.
+- `POST /api/admin/checkins/reset-all` + Check-in report "Reset all check-ins" button clears all real check-ins (used→valid) without touching orders/tickets/stats.
+
+
 ## Architecture
 - FastAPI + MongoDB (motor) backend, JWT cookie auth (bcrypt), admin seeding from .env
 - React + Tailwind + framer-motion + lenis frontend, recharts (admin), html5-qrcode (scanner)

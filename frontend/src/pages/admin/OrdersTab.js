@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Download } from "lucide-react";
+import { Download, MailWarning } from "lucide-react";
 import { api, formatError } from "@/api";
 import { SearchIcon, inputCls } from "./shared";
 import { OrderRow } from "./OrderRow";
-import { downloadOrdersCsv, matchesFilters } from "./orderUtils";
+import { downloadOrdersCsv, matchesFilters, isPaid } from "./orderUtils";
 
 const HEADERS = ["Date", "Buyer", "Category", "Tier", "Qty", "Amount", "Ticket codes", "Payment", "Marketing", "Ticket email"];
 
@@ -85,8 +85,7 @@ export function OrdersTab() {
   const resend = (id) => run(async () => {
     await api.post(`/admin/orders/${id}/resend-email`);
     toast.success("Ticket email resent (same tickets)");
-  });
-  const removeOrder = (id) => {
+  });  const removeOrder = (id) => {
     if (!window.confirm("Really delete this order and its tickets? The QR codes will stop working.")) return;
     run(async () => {
       const r = await api.delete(`/admin/orders/${id}`);
@@ -94,10 +93,53 @@ export function OrdersTab() {
     });
   };
 
+  const [resendingAll, setResendingAll] = useState(false);
+  const undelivered = orders.filter(
+    (o) => isPaid(o) && !o.ticket_email_sent_at && !/Undeliverable/i.test(o.ticket_email_error || "")
+  );
+  const resendAll = async () => {
+    if (!window.confirm(`Resend tickets to ${undelivered.length} paid buyer(s) who never received their email? They get the exact same QR codes — no new tickets are created.`)) return;
+    setResendingAll(true);
+    try {
+      const r = await api.post("/admin/orders/resend-unsent");
+      toast.success(`Sent ${r.data.sent} of ${r.data.candidates} undelivered ticket email(s)`);
+      const failed = (r.data.results || []).filter((x) => !x.ok);
+      if (failed.length) toast.warning(`${failed.length} could not be sent (check the Ticket email column)`);
+      await load();
+    } catch (e) {
+      toast.error(formatError(e));
+    } finally {
+      setResendingAll(false);
+    }
+  };
+
   const filtered = orders.filter((o) => matchesFilters(o, { q, cat }));
 
   return (
     <div className="space-y-5" data-testid="admin-orders">
+      {undelivered.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-[#FFE600]/40 bg-[#FFE600]/[0.06] rounded-2xl px-5 py-4" data-testid="undelivered-banner">
+          <div className="flex items-start gap-3">
+            <MailWarning size={18} className="text-[#FFE600] mt-0.5 shrink-0" />
+            <div>
+              <p className="font-mono2 text-xs uppercase tracking-[0.15em] text-[#FFE600]">
+                {undelivered.length} paid buyer(s) never received their ticket
+              </p>
+              <p className="font-mono2 text-[11px] text-slate-400 mt-1">
+                Resend the exact same QR codes now — no new tickets are created.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={resendAll}
+            disabled={resendingAll}
+            data-testid="resend-all-undelivered"
+            className="shrink-0 font-mono2 text-xs uppercase tracking-[0.15em] px-5 py-2.5 rounded-lg border border-[#FFE600] text-[#FFE600] hover:bg-[#FFE600] hover:text-black transition-colors disabled:opacity-40"
+          >
+            {resendingAll ? "Sending…" : "Resend all now"}
+          </button>
+        </div>
+      )}
       <OrdersToolbar
         q={q} setQ={setQ} cat={cat} setCat={setCat}
         showAbandoned={showAbandoned}
