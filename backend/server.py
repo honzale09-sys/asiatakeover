@@ -2126,6 +2126,19 @@ async def admin_test_tickets_delete(admin=Depends(get_current_admin)):
     return {"ok": True, "deleted": n}
 
 
+@api_router.post("/admin/checkins/reset-all")
+async def admin_reset_all_checkins(admin=Depends(get_current_admin)):
+    """Undo every real-ticket check-in (status 'used' -> 'valid'). Orders, payments and the
+    tickets themselves are untouched — only the door check-in flag is cleared. Use before an
+    event to wipe rehearsal scans. Test tickets live in their own collection and aren't touched."""
+    r = await db.tickets.update_many(
+        {"status": "used"},
+        {"$set": {"status": "valid", "checked_in_at": None, "checked_in_by": None}},
+    )
+    logger.warning("ADMIN %s reset ALL check-ins (%d ticket(s))", admin.get("email"), r.modified_count)
+    return {"ok": True, "reset": r.modified_count}
+
+
 @api_router.post("/admin/tickets/{code}/reset-checkin")
 async def admin_reset_checkin(code: str, admin=Depends(get_current_admin)):
     """Undo an accidental check-in: ticket becomes valid again. Order/payment untouched."""

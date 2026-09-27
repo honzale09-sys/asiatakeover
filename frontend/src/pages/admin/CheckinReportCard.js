@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Download, RefreshCw } from "lucide-react";
+import { Download, RefreshCw, Eraser } from "lucide-react";
 import { api, formatError } from "@/api";
 import { cardCls, actBtn, fmtDate } from "./shared";
 
@@ -16,11 +16,26 @@ function exportScansCsv(scans) {
 
 export function CheckinReportCard({ refreshKey = 0 }) {
   const [rep, setRep] = useState(null);
+  const [busy, setBusy] = useState(false);
   const load = useCallback(
     () => api.get("/admin/checkin-report").then((r) => setRep(r.data)).catch((e) => toast.error(formatError(e))),
     []
   );
   useEffect(() => { load(); }, [load, refreshKey]);
+
+  const resetAll = async () => {
+    if (!window.confirm("Undo ALL check-ins? Every scanned ticket becomes valid again. Orders and tickets are kept — only the door check-in flag is cleared.")) return;
+    setBusy(true);
+    try {
+      const r = await api.post("/admin/checkins/reset-all");
+      toast.success(`Cleared ${r.data.reset} check-in(s)`);
+      await load();
+    } catch (e) {
+      toast.error(formatError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (!rep) return <div className={cardCls}><p className="font-mono2 text-sm text-slate-500">Loading check-in report…</p></div>;
 
@@ -34,6 +49,7 @@ export function CheckinReportCard({ refreshKey = 0 }) {
         <div className="flex gap-2">
           <button onClick={load} className={actBtn} data-testid="checkin-refresh"><RefreshCw size={12} className="inline mr-1" />Refresh</button>
           <button onClick={() => exportScansCsv(rep.scans || [])} className={actBtn} data-testid="checkin-export"><Download size={12} className="inline mr-1" />Export CSV</button>
+          <button onClick={resetAll} disabled={busy || !rep.checked_in} className={`${actBtn} disabled:opacity-40`} data-testid="checkin-reset-all"><Eraser size={12} className="inline mr-1" />Reset all check-ins</button>
         </div>
       </div>
 
