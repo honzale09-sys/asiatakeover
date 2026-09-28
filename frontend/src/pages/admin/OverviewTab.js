@@ -4,6 +4,7 @@ import { api, formatError, czk } from "@/api";
 import { StatCard, cardCls } from "./shared";
 import { GuestListCard } from "./GuestListCard";
 import { CheckinReportCard } from "./CheckinReportCard";
+import { FinalAuditCard } from "./FinalAuditCard";
 import { TestModeCard } from "./TestModeCard";
 import { SalesOverview } from "./SalesOverview";
 
@@ -70,6 +71,7 @@ export function OverviewTab() {
         <GuestListCard category="standard" stats={stats} onSent={reload} />
       </div>
       <CheckinReportCard refreshKey={tick} />
+      <FinalAuditCard />
       {stats.revenue_check && <RevenueCheckCard stats={stats} />}
       <SalesOverview />
       <TestModeCard />

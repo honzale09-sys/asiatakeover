@@ -2045,6 +2045,93 @@ async def admin_checkin_report(admin=Depends(get_current_admin)):
     }
 
 
+def _audit_is_vip(tier_name: str) -> bool:
+    return "VIP" in (tier_name or "").upper()
+
+
+@api_router.post("/admin/final-audit")
+async def final_audit(admin=Depends(get_current_admin)):
+    """Final wristband reconciliation against REAL production data only (test tickets live in a
+    separate collection and are never touched). Read-mostly: the only write is an upward repair —
+    a ticket that already carries a check-in timestamp but somehow isn't marked 'used' (and whose
+    order is paid) is set to 'used'. Nothing is deleted, reset or recreated."""
+    STD_WRISTBANDS, VIP_WRISTBANDS = 1500, 500
+
+    # 1) Repair: scan evidence present but not marked checked-in -> mark used
+    repaired = 0
+    async for t in db.tickets.find({"checked_in_at": {"$ne": None},
+                                    "status": {"$nin": ["used", "refunded"]}}):
+        if await order_status_for(t) in ("paid", "paid_mock"):
+            await db.tickets.update_one({"id": t["id"]}, {"$set": {"status": "used"}})
+            repaired += 1
+
+    orders = {o["id"]: o for o in await db.orders.find({}, {"_id": 0}).to_list(100000)}
+    tickets = await db.tickets.find({}, {"_id": 0}).to_list(100000)
+
+    cats = {"standard": {"paid": 0, "free": 0, "checked_in": 0},
+            "vip": {"paid": 0, "free": 0, "checked_in": 0}}
+
+    for t in tickets:
+        if t.get("status") == "refunded":
+            continue
+        o = orders.get(t.get("order_id")) or {}
+        order_paid = is_paid(o)
+        is_free = bool(t.get("guest_list")) or bool(o.get("comp"))
+        is_paid_ticket = order_paid and not is_free and (o.get("amount_czk") or 0) > 0
+        if not is_paid_ticket and not is_free:
+            continue  # ticket tied to an unpaid/abandoned order — not issued
+        cat = "vip" if _audit_is_vip(t.get("tier_name")) else "standard"
+        if is_paid_ticket:
+            cats[cat]["paid"] += 1
+        else:
+            cats[cat]["free"] += 1
+        if t.get("status") == "used":
+            cats[cat]["checked_in"] += 1
+
+    # Revenue: actual amount paid on paid, non-comp, non-guest-list orders (incl. discounts & upgrades)
+    revenue = sum(
+        o.get("amount_czk", 0) for o in orders.values()
+        if is_paid(o) and not o.get("comp") and not o.get("guest_list") and (o.get("amount_czk") or 0) > 0
+    )
+
+    def block(cat):
+        c = cats[cat]
+        issued = c["paid"] + c["free"]
+        return {"paid_issued": c["paid"], "free_issued": c["free"],
+                "checked_in": c["checked_in"], "not_checked_in": issued - c["checked_in"],
+                "total_issued": issued}
+
+    std, vip = block("standard"), block("vip")
+    total_paid = std["paid_issued"] + vip["paid_issued"]
+    total_free = std["free_issued"] + vip["free_issued"]
+    total_issued = std["total_issued"] + vip["total_issued"]
+    total_checked_in = std["checked_in"] + vip["checked_in"]
+
+    logger.warning("ADMIN %s ran FINAL AUDIT (repaired %d ticket(s))", admin.get("email"), repaired)
+    return {
+        "repaired_checkins": repaired,
+        "standard": std,
+        "vip": vip,
+        "total": {
+            "paid_issued": total_paid,
+            "free_issued": total_free,
+            "total_issued": total_issued,
+            "checked_in": total_checked_in,
+            "not_checked_in": total_issued - total_checked_in,
+            "revenue_czk": revenue,
+        },
+        "wristbands": {
+            "standard_supplied": STD_WRISTBANDS,
+            "standard_checked_in": std["checked_in"],
+            "standard_remaining": STD_WRISTBANDS - std["checked_in"],
+            "vip_supplied": VIP_WRISTBANDS,
+            "vip_checked_in": vip["checked_in"],
+            "vip_remaining": VIP_WRISTBANDS - vip["checked_in"],
+        },
+    }
+
+
+
 # ---------------- private test mode (admin only) ----------------
 # Test QR codes live in their own collection: they go through the real scanner flow but are
 # invisible to orders, revenue, sold tickets, check-ins and every statistic.
